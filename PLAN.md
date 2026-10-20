@@ -12,7 +12,7 @@ before phase 1 starts.
 
 | Question | Answer |
 |---|---|
-| Kind of shift | Fixed transpose by an interval of an equal division of the octave (EDO): octaves + steps of 1/N octave |
+| Kind of shift | Fixed transpose by an interval of an equal division of the octave (EDO): octaves + steps of 1/N octave. Every note moves by the same interval; the keyboard stays 12-TET (no key → N-EDO mapping) |
 | MIDI 1.0 output, fractional pitch | Round to the nearest semitone |
 | MIDI 2.0 output, fractional pitch | Note On attribute type 3, **Pitch 7.9** |
 | Form | Plugin. CLAP first, then the other formats clap-wrapper supports for MIDI→MIDI |
@@ -132,8 +132,5 @@ AU/VST3 wrappers (phase 3) move down the list.
   as a `CLAP_NOTE_EXPRESSION_TUNING` after each Note On, or rounded like MIDI 1.0?
 - **Parameter ranges.** Max N? Octaves ±4? Should Steps be limited to ±N (Octaves covers the rest)
   or allowed wider? If N is lowered below |Steps|, clamp or keep?
-- **Fixed shift vs. keyboard mapping.** Assumed: every note moves by the same EDO interval (the
-  incoming keys stay 12-TET). Alternative: map each incoming key to one N-EDO step, so the keyboard
-  plays N-EDO. Confirm the first.
 - **Source control.** This folder is not a git repo yet. Should it get `git init`, and is a GitHub
   remote wanted?
