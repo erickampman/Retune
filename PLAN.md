@@ -4,8 +4,9 @@ A MIDI-in → MIDI-out note effect that transposes every note by a fixed interva
 It is CLAP-first, with the same layout as StruckSynth and PlainOldSynth: a hand-written raw CLAP entry
 point and the vendored free-audio **clap-wrapper** for the other formats.
 
-**Status (2026-10-20):** phase 1 (the core library) is done: RetuneCore over uw-core's uw::ump, with
-tests. Next is phase 2, the raw CLAP plugin.
+**Status (2026-10-20):** phases 1 and 2 are done in code: RetuneCore over uw-core's uw::ump, and the
+raw CLAP plugin (clap-validator clean, headless host test). Still to do in phase 2: run the dialect
+log in Bitwig and REAPER, and listen through StageHand once it can host note effects.
 
 ## Decisions so far
 
@@ -45,7 +46,8 @@ would take wrapper patches (see the last phase).
 - **Shift** in semitones = `12 × Octaves + 12 × Steps / N` (in cents: `1200 × Octaves + 1200 × Steps / N`).
   With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
 - **Output format follows the input format.** An event that arrives as MIDI 1.0 leaves as MIDI 1.0.
-  An event that arrives as MIDI 2.0 leaves as MIDI 2.0. (CLAP note events: TBD.)
+  An event that arrives as MIDI 2.0 leaves as MIDI 2.0. (CLAP note events: TBD. Until then, any a
+  host sends anyway pass through untransposed, so notes aren't lost.)
 - **MIDI 1.0 path**: `outKey = inKey + round(shift)`.
 - **MIDI 2.0 path**: take the Note On's pitch as 7.9 (from its attribute if it has type 3, otherwise
   `key << 9`), add `round(shift × 512)`, and write it back as attribute type 3. `outKey` is the

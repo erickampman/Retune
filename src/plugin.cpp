@@ -1,0 +1,545 @@
+// src/plugin.cpp — Retune: the CLAP plugin around RetuneCore. A note effect with one note input
+// and one note output port and three parameters (Divisions, Octaves, Steps). Hand-written CLAP
+// entry point, as in PlainOldSynth and StruckSynth, so the ports can speak MIDI 2.0.
+//
+// The ports advertise MIDI | MIDI2 and prefer MIDI2 (PLAN.md: MIDI 2.0 is the base case; the
+// CLAP note dialect is TBD). Output follows input: a CLAP_EVENT_MIDI2 leaves as CLAP_EVENT_MIDI2,
+// a CLAP_EVENT_MIDI as CLAP_EVENT_MIDI. CLAP note events, which a host shouldn't send to these
+// ports, pass through untransposed rather than being lost.
+//
+// Building with RETUNE_DIALECT_LOG on adds a log of what the host sends (its supported note
+// dialects and a count of every incoming note event by kind), to learn what Bitwig, REAPER and
+// others actually deliver to a note effect. The audio thread only counts; the main thread
+// writes the log on deactivate and destroy.
+
+#include <clap/clap.h>
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+#include "RetuneCore.h"
+#include "uw/ump/Ump.h"
+
+#ifndef RETUNE_VERSION_STRING
+#define RETUNE_VERSION_STRING "0.1.0"
+#endif
+
+namespace {
+
+namespace ump = uw::ump;
+
+// ---------------------------------------------------------------------------------------------
+// Parameters (appended, never inserted: the ids are the indices)
+// ---------------------------------------------------------------------------------------------
+
+struct ParamSpec {
+    const char* name;
+    const char* symbol;   // state file key
+    double      min, max, def;
+};
+
+constexpr ParamSpec kParams[] = {
+    {"Divisions", "divisions", retune::kMinDivisions, retune::kMaxDivisions, 12},
+    {"Octaves", "octaves", -retune::kMaxOctaves, retune::kMaxOctaves, 0},
+    // The host sees ±(max N); RetuneCore clamps Steps to ±N when it uses it (PLAN.md).
+    {"Steps", "steps", -retune::kMaxDivisions, retune::kMaxDivisions, 0},
+};
+constexpr uint32_t kParamCount = sizeof(kParams) / sizeof(kParams[0]);
+
+double clampParam(uint32_t index, double value) {
+    return std::clamp(std::round(value), kParams[index].min, kParams[index].max);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dialect log
+// ---------------------------------------------------------------------------------------------
+
+#ifdef RETUNE_DIALECT_LOG
+// Incoming note events by kind. MIDI 2.0 and MIDI 1.0 are split by channel-voice status.
+enum Kind : uint32_t {
+    kClapNoteOn, kClapNoteOff, kClapNoteChoke, kClapNoteExpression,
+    kMidi1Base,                 // + status nibble 0x8..0xE, or 0xF for system
+    kMidi2Base = kMidi1Base + 16,   // + status nibble; other UMP message types go to kMidi2Other
+    kMidi2Other = kMidi2Base + 16,
+    kSysex,
+    kKindCount
+};
+
+const char* kindName(uint32_t k, char* buffer, size_t size) {
+    static const char* const clapNames[] = {"CLAP note on", "CLAP note off", "CLAP note choke",
+                                            "CLAP note expression"};
+    if (k < kMidi1Base) return clapNames[k];
+    if (k < kMidi2Base) std::snprintf(buffer, size, "MIDI 1.0 status 0x%X", k - kMidi1Base);
+    else if (k < kMidi2Other) std::snprintf(buffer, size, "MIDI2 UMP MT 0x4 status 0x%X", k - kMidi2Base);
+    else if (k == kMidi2Other) std::snprintf(buffer, size, "MIDI2 UMP, other message type");
+    else std::snprintf(buffer, size, "MIDI SysEx");
+    return buffer;
+}
+
+std::string logPath() {
+    const char* home = std::getenv("HOME");
+    std::string path = home != nullptr ? home : ".";
+#ifdef __APPLE__
+    path += "/Library/Logs/Retune-dialects.log";
+#else
+    path += "/retune-dialects.log";
+#endif
+    return path;
+}
+#endif
+
+// ---------------------------------------------------------------------------------------------
+// The plugin
+// ---------------------------------------------------------------------------------------------
+
+struct Plugin {
+    clap_plugin_t      clap{};
+    const clap_host_t* host = nullptr;
+
+    // Parameter values: written by process/flush and by state_load; read by the main thread.
+    std::atomic<double> values[kParamCount];
+    std::atomic<bool>   valuesChangedByState{false};   // state_load → process: re-apply
+
+    retune::RetuneCore core;   // audio thread while active; main thread otherwise
+    std::string        scratch;
+
+#ifdef RETUNE_DIALECT_LOG
+    std::atomic<uint64_t> counts[kKindCount];
+    uint32_t              hostDialects = 0;
+    bool                  hostHasNotePorts = false;
+#endif
+};
+
+Plugin* self(const clap_plugin_t* plugin) { return static_cast<Plugin*>(plugin->plugin_data); }
+
+retune::Params currentParams(const Plugin* p) {
+    return {int(p->values[0].load(std::memory_order_relaxed)),
+            int(p->values[1].load(std::memory_order_relaxed)),
+            int(p->values[2].load(std::memory_order_relaxed))};
+}
+
+void applyParamEvent(Plugin* p, const clap_event_param_value_t* ev) {
+    if (ev->param_id >= kParamCount) return;
+    p->values[ev->param_id].store(clampParam(ev->param_id, ev->value), std::memory_order_relaxed);
+    p->core.setParams(currentParams(p));
+}
+
+#ifdef RETUNE_DIALECT_LOG
+void count(Plugin* p, uint32_t kind) { p->counts[kind].fetch_add(1, std::memory_order_relaxed); }
+
+void countEvent(Plugin* p, const clap_event_header_t* h) {
+    switch (h->type) {
+        case CLAP_EVENT_NOTE_ON:         count(p, kClapNoteOn); break;
+        case CLAP_EVENT_NOTE_OFF:        count(p, kClapNoteOff); break;
+        case CLAP_EVENT_NOTE_CHOKE:      count(p, kClapNoteChoke); break;
+        case CLAP_EVENT_NOTE_EXPRESSION: count(p, kClapNoteExpression); break;
+        case CLAP_EVENT_MIDI_SYSEX:      count(p, kSysex); break;
+        case CLAP_EVENT_MIDI: {
+            const uint8_t status = reinterpret_cast<const clap_event_midi_t*>(h)->data[0];
+            count(p, kMidi1Base + (status >> 4));
+            break;
+        }
+        case CLAP_EVENT_MIDI2: {
+            const uint32_t w0 = reinterpret_cast<const clap_event_midi2_t*>(h)->data[0];
+            count(p, (w0 >> 28) == 0x4 ? kMidi2Base + ((w0 >> 20) & 0xF) : uint32_t(kMidi2Other));
+            break;
+        }
+        default: break;
+    }
+}
+
+void writeDialectLog(Plugin* p, const char* when) {
+    FILE* f = std::fopen(logPath().c_str(), "a");
+    if (f == nullptr) return;
+    const char* hostName = p->host != nullptr && p->host->name != nullptr ? p->host->name : "?";
+    const char* hostVersion = p->host != nullptr && p->host->version != nullptr ? p->host->version : "?";
+    std::fprintf(f, "--- Retune %s, %s, host \"%s\" %s\n", RETUNE_VERSION_STRING, when, hostName,
+                 hostVersion);
+    if (p->hostHasNotePorts)
+        std::fprintf(f, "host note dialects: 0x%X (%s%s%s%s)\n", p->hostDialects,
+                     (p->hostDialects & CLAP_NOTE_DIALECT_CLAP) ? "CLAP " : "",
+                     (p->hostDialects & CLAP_NOTE_DIALECT_MIDI) ? "MIDI " : "",
+                     (p->hostDialects & CLAP_NOTE_DIALECT_MIDI_MPE) ? "MIDI_MPE " : "",
+                     (p->hostDialects & CLAP_NOTE_DIALECT_MIDI2) ? "MIDI2" : "");
+    else
+        std::fprintf(f, "host note dialects: host has no note-ports extension\n");
+    char buffer[64];
+    bool any = false;
+    for (uint32_t k = 0; k < kKindCount; ++k) {
+        const uint64_t n = p->counts[k].load(std::memory_order_relaxed);
+        if (n == 0) continue;
+        std::fprintf(f, "  %-36s %llu\n", kindName(k, buffer, sizeof(buffer)), (unsigned long long)n);
+        any = true;
+    }
+    if (!any) std::fprintf(f, "  no note events received\n");
+    std::fclose(f);
+}
+#endif
+
+// ---------------------------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------------------------
+
+bool push(const clap_output_events_t* out, const clap_event_header_t* h) {
+    return out != nullptr && out->try_push != nullptr && out->try_push(out, h);
+}
+
+// Run one UMP through the core and push what comes out, in the dialect it came in.
+void transposeAndPush(Plugin* p, const clap_event_header_t* in, uint16_t port,
+                      const uw::MidiMessage& m, bool asMidi1,
+                      const clap_output_events_t* out) {
+    uw::MidiMessage results[retune::kMaxOut];
+    const std::size_t n = p->core.process(m, results);
+    for (std::size_t i = 0; i < n; ++i) {
+        if (asMidi1) {
+            clap_event_midi_t ev{};
+            ev.header = {sizeof(ev), in->time, CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, in->flags};
+            ev.port_index = port;
+            if (ump::toMidi1Bytes(results[i], ev.data) == 0) continue;
+            push(out, &ev.header);
+        } else {
+            clap_event_midi2_t ev{};
+            ev.header = {sizeof(ev), in->time, CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI2, in->flags};
+            ev.port_index = port;
+            std::memcpy(ev.data, results[i].words, sizeof(ev.data));
+            push(out, &ev.header);
+        }
+    }
+}
+
+void handleEvent(Plugin* p, const clap_event_header_t* h, const clap_output_events_t* out) {
+    if (h->space_id != CLAP_CORE_EVENT_SPACE_ID) return;
+#ifdef RETUNE_DIALECT_LOG
+    countEvent(p, h);
+#endif
+    switch (h->type) {
+        case CLAP_EVENT_PARAM_VALUE:
+            applyParamEvent(p, reinterpret_cast<const clap_event_param_value_t*>(h));
+            break;
+
+        case CLAP_EVENT_MIDI2: {
+            const auto* ev = reinterpret_cast<const clap_event_midi2_t*>(h);
+            uw::MidiMessage m;
+            std::memcpy(m.words, ev->data, sizeof(m.words));
+            m.wordCount = ump::wordCountForType(uint8_t(m.words[0] >> 28));
+            transposeAndPush(p, h, ev->port_index, m, false, out);
+            break;
+        }
+
+        case CLAP_EVENT_MIDI: {
+            const auto* ev = reinterpret_cast<const clap_event_midi_t*>(h);
+            if (ev->data[0] >= 0x80 && ev->data[0] < 0xF0) {
+                // Channel voice: wrap as MT 0x2 (group 0), the core's MIDI 1.0 form.
+                uw::MidiMessage m;
+                m.words[0]  = 0x2000'0000u | (uint32_t(ev->data[0]) << 16) |
+                              (uint32_t(ev->data[1] & 0x7F) << 8) | uint32_t(ev->data[2] & 0x7F);
+                m.wordCount = 1;
+                transposeAndPush(p, h, ev->port_index, m, true, out);
+            } else {
+                push(out, h);   // system messages pass through as they are
+            }
+            break;
+        }
+
+        case CLAP_EVENT_MIDI_SYSEX:
+        case CLAP_EVENT_NOTE_ON:
+        case CLAP_EVENT_NOTE_OFF:
+        case CLAP_EVENT_NOTE_CHOKE:
+        case CLAP_EVENT_NOTE_EXPRESSION:
+            push(out, h);   // SysEx passes through; CLAP note events: TBD (see the top)
+            break;
+
+        default:
+            break;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// clap_plugin
+// ---------------------------------------------------------------------------------------------
+
+bool plug_init(const clap_plugin_t* plugin) {
+#ifdef RETUNE_DIALECT_LOG
+    Plugin* p = self(plugin);
+    const auto* notePorts = static_cast<const clap_host_note_ports_t*>(
+        p->host->get_extension(p->host, CLAP_EXT_NOTE_PORTS));
+    if (notePorts != nullptr && notePorts->supported_dialects != nullptr) {
+        p->hostHasNotePorts = true;
+        p->hostDialects     = notePorts->supported_dialects(p->host);
+    }
+#else
+    (void)plugin;
+#endif
+    return true;
+}
+
+void plug_destroy(const clap_plugin_t* plugin) {
+    Plugin* p = self(plugin);
+#ifdef RETUNE_DIALECT_LOG
+    writeDialectLog(p, "destroy");
+#endif
+    delete p;
+}
+
+bool plug_activate(const clap_plugin_t* plugin, double, uint32_t, uint32_t) {
+    Plugin* p = self(plugin);
+    p->core.reset();
+    p->core.setParams(currentParams(p));
+    p->valuesChangedByState.store(false, std::memory_order_relaxed);
+    return true;
+}
+
+void plug_deactivate(const clap_plugin_t* plugin) {
+#ifdef RETUNE_DIALECT_LOG
+    writeDialectLog(self(plugin), "deactivate");
+#else
+    (void)plugin;
+#endif
+}
+
+bool plug_start_processing(const clap_plugin_t*) { return true; }
+void plug_stop_processing(const clap_plugin_t*) {}
+
+void plug_reset(const clap_plugin_t* plugin) { self(plugin)->core.reset(); }
+
+clap_process_status plug_process(const clap_plugin_t* plugin, const clap_process_t* process) {
+    Plugin* p = self(plugin);
+    if (p->valuesChangedByState.exchange(false, std::memory_order_acquire))
+        p->core.setParams(currentParams(p));
+
+    const clap_input_events_t* in = process->in_events;
+    const uint32_t count = in != nullptr ? in->size(in) : 0;
+    for (uint32_t i = 0; i < count; ++i)
+        handleEvent(p, in->get(in, i), process->out_events);
+    return CLAP_PROCESS_CONTINUE;
+}
+
+void plug_on_main_thread(const clap_plugin_t*) {}
+
+// ---------------------------------------------------------------------------------------------
+// audio-ports extension: none (a note effect)
+// ---------------------------------------------------------------------------------------------
+
+uint32_t audio_ports_count(const clap_plugin_t*, bool) { return 0; }
+bool audio_ports_get(const clap_plugin_t*, uint32_t, bool, clap_audio_port_info_t*) { return false; }
+const clap_plugin_audio_ports_t kAudioPorts = {audio_ports_count, audio_ports_get};
+
+// ---------------------------------------------------------------------------------------------
+// note-ports extension: one in, one out
+// ---------------------------------------------------------------------------------------------
+
+uint32_t note_ports_count(const clap_plugin_t*, bool) { return 1; }
+
+bool note_ports_get(const clap_plugin_t*, uint32_t index, bool isInput, clap_note_port_info_t* info) {
+    if (index != 0) return false;
+    std::memset(info, 0, sizeof(*info));
+    info->id                 = isInput ? 0 : 1;
+    info->supported_dialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2;
+    info->preferred_dialect  = CLAP_NOTE_DIALECT_MIDI2;
+    std::snprintf(info->name, sizeof(info->name), "%s", isInput ? "Notes in" : "Notes out");
+    return true;
+}
+
+const clap_plugin_note_ports_t kNotePorts = {note_ports_count, note_ports_get};
+
+// ---------------------------------------------------------------------------------------------
+// params extension
+// ---------------------------------------------------------------------------------------------
+
+uint32_t params_count(const clap_plugin_t*) { return kParamCount; }
+
+bool params_get_info(const clap_plugin_t*, uint32_t index, clap_param_info_t* info) {
+    if (index >= kParamCount) return false;
+    std::memset(info, 0, sizeof(*info));
+    info->id            = index;
+    info->flags         = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED;
+    info->min_value     = kParams[index].min;
+    info->max_value     = kParams[index].max;
+    info->default_value = kParams[index].def;
+    std::snprintf(info->name, sizeof(info->name), "%s", kParams[index].name);
+    return true;
+}
+
+bool params_get_value(const clap_plugin_t* plugin, clap_id id, double* out) {
+    if (id >= kParamCount) return false;
+    *out = self(plugin)->values[id].load(std::memory_order_relaxed);
+    return true;
+}
+
+bool params_value_to_text(const clap_plugin_t*, clap_id id, double value, char* out, uint32_t size) {
+    if (id >= kParamCount) return false;
+    std::snprintf(out, size, "%d", int(clampParam(id, value)));
+    return true;
+}
+
+bool params_text_to_value(const clap_plugin_t*, clap_id id, const char* text, double* out) {
+    if (id >= kParamCount) return false;
+    char* end = nullptr;
+    const double value = std::strtod(text, &end);
+    if (end == text) return false;
+    *out = clampParam(id, value);
+    return true;
+}
+
+void params_flush(const clap_plugin_t* plugin, const clap_input_events_t* in,
+                  const clap_output_events_t*) {
+    // Never concurrent with process, so the core can be updated here too.
+    Plugin* p = self(plugin);
+    const uint32_t count = in != nullptr ? in->size(in) : 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        const clap_event_header_t* h = in->get(in, i);
+        if (h->space_id == CLAP_CORE_EVENT_SPACE_ID && h->type == CLAP_EVENT_PARAM_VALUE)
+            applyParamEvent(p, reinterpret_cast<const clap_event_param_value_t*>(h));
+    }
+}
+
+const clap_plugin_params_t kParamsExt = {params_count, params_get_info, params_get_value,
+                                         params_value_to_text, params_text_to_value, params_flush};
+
+// ---------------------------------------------------------------------------------------------
+// state extension: "Retune 1" then "<symbol> <value>" lines; unknown symbols are ignored
+// ---------------------------------------------------------------------------------------------
+
+bool state_save(const clap_plugin_t* plugin, const clap_ostream_t* stream) {
+    Plugin* p = self(plugin);
+    p->scratch = "Retune 1\n";
+    char line[64];
+    for (uint32_t i = 0; i < kParamCount; ++i) {
+        std::snprintf(line, sizeof(line), "%s %d\n", kParams[i].symbol,
+                      int(p->values[i].load(std::memory_order_relaxed)));
+        p->scratch += line;
+    }
+    const auto* bytes = reinterpret_cast<const uint8_t*>(p->scratch.data());
+    for (uint64_t done = 0; done < p->scratch.size();) {
+        const int64_t written = stream->write(stream, bytes + done, p->scratch.size() - done);
+        if (written <= 0) return false;
+        done += uint64_t(written);
+    }
+    return true;
+}
+
+bool state_load(const clap_plugin_t* plugin, const clap_istream_t* stream) {
+    Plugin* p = self(plugin);
+    std::string text;
+    char buffer[256];
+    for (;;) {
+        const int64_t read = stream->read(stream, buffer, sizeof(buffer));
+        if (read < 0) return false;
+        if (read == 0) break;
+        text.append(buffer, size_t(read));
+    }
+    if (text.rfind("Retune ", 0) != 0) return false;   // empty, or not ours
+
+    size_t pos = text.find('\n');
+    while (pos != std::string::npos && pos + 1 < text.size()) {
+        const size_t start = pos + 1;
+        pos = text.find('\n', start);
+        const std::string line = text.substr(start, pos == std::string::npos ? std::string::npos
+                                                                              : pos - start);
+        const size_t space = line.find(' ');
+        if (space == std::string::npos) continue;
+        for (uint32_t i = 0; i < kParamCount; ++i)
+            if (line.compare(0, space, kParams[i].symbol) == 0)
+                p->values[i].store(clampParam(i, std::strtod(line.c_str() + space + 1, nullptr)),
+                                   std::memory_order_relaxed);
+    }
+    p->valuesChangedByState.store(true, std::memory_order_release);
+
+    const auto* hostParams = static_cast<const clap_host_params_t*>(
+        p->host->get_extension(p->host, CLAP_EXT_PARAMS));
+    if (hostParams != nullptr && hostParams->rescan != nullptr)
+        hostParams->rescan(p->host, CLAP_PARAM_RESCAN_VALUES);
+    return true;
+}
+
+const clap_plugin_state_t kStateExt = {state_save, state_load};
+
+const void* plug_get_extension(const clap_plugin_t*, const char* id) {
+    if (std::strcmp(id, CLAP_EXT_AUDIO_PORTS) == 0) return &kAudioPorts;
+    if (std::strcmp(id, CLAP_EXT_NOTE_PORTS) == 0) return &kNotePorts;
+    if (std::strcmp(id, CLAP_EXT_PARAMS) == 0) return &kParamsExt;
+    if (std::strcmp(id, CLAP_EXT_STATE) == 0) return &kStateExt;
+    return nullptr;
+}
+
+// ---------------------------------------------------------------------------------------------
+// descriptor + factory + entry
+// ---------------------------------------------------------------------------------------------
+
+const char* kFeatures[] = {
+    CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+    CLAP_PLUGIN_FEATURE_UTILITY,
+    nullptr,
+};
+
+const clap_plugin_descriptor_t kDescriptor = {
+    .clap_version = CLAP_VERSION_INIT,
+    .id           = "com.unlikelyware.retune",
+    .name         = "Retune",
+    .vendor       = "Unlikelyware",
+    .url          = "https://unlikelyware.com",
+    .manual_url   = "",
+    .support_url  = "",
+    .version      = RETUNE_VERSION_STRING,
+    .description  = "Transposes notes by an interval of an equal division of the octave; "
+                    "MIDI 2.0 notes keep the fraction as a Pitch 7.9 attribute.",
+    .features     = kFeatures,
+};
+
+const clap_plugin_t* factory_create(const clap_plugin_factory_t*, const clap_host_t* host,
+                                    const char* id) {
+    if (std::strcmp(id, kDescriptor.id) != 0) return nullptr;
+    auto* p = new (std::nothrow) Plugin();
+    if (p == nullptr) return nullptr;
+    p->host = host;
+    for (uint32_t i = 0; i < kParamCount; ++i)
+        p->values[i].store(kParams[i].def, std::memory_order_relaxed);
+#ifdef RETUNE_DIALECT_LOG
+    for (auto& c : p->counts) c.store(0, std::memory_order_relaxed);
+#endif
+    p->core.setParams(currentParams(p));
+    p->clap = clap_plugin_t{
+        .desc             = &kDescriptor,
+        .plugin_data      = p,
+        .init             = plug_init,
+        .destroy          = plug_destroy,
+        .activate         = plug_activate,
+        .deactivate       = plug_deactivate,
+        .start_processing = plug_start_processing,
+        .stop_processing  = plug_stop_processing,
+        .reset            = plug_reset,
+        .process          = plug_process,
+        .get_extension    = plug_get_extension,
+        .on_main_thread   = plug_on_main_thread,
+    };
+    return &p->clap;
+}
+
+uint32_t factory_count(const clap_plugin_factory_t*) { return 1; }
+
+const clap_plugin_descriptor_t* factory_get(const clap_plugin_factory_t*, uint32_t index) {
+    return index == 0 ? &kDescriptor : nullptr;
+}
+
+const clap_plugin_factory_t kFactory = {factory_count, factory_get, factory_create};
+
+bool entry_init(const char*) { return true; }
+void entry_deinit() {}
+
+const void* entry_get_factory(const char* factoryId) {
+    return std::strcmp(factoryId, CLAP_PLUGIN_FACTORY_ID) == 0 ? &kFactory : nullptr;
+}
+
+} // namespace
+
+extern "C" CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
+    .clap_version = CLAP_VERSION_INIT,
+    .init         = entry_init,
+    .deinit       = entry_deinit,
+    .get_factory  = entry_get_factory,
+};

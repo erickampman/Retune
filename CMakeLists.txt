@@ -24,10 +24,58 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     target_compile_options(retune_core PRIVATE -Wall -Wextra -Wconversion)
 endif()
 
+# --- the .clap ---------------------------------------------------------------------------------
+# Hidden visibility, so clap_entry (CLAP_EXPORT in plugin.cpp) is the only exported symbol and two
+# plugins with different uw-core pins can't bind to each other's copies.
+option(RETUNE_DIALECT_LOG "Log the host's note dialects and incoming note events (diagnostic)" OFF)
+
+set_target_properties(retune_core PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+add_library(Retune MODULE src/plugin.cpp)
+target_include_directories(Retune PRIVATE external/clap/include)
+target_link_libraries(Retune PRIVATE retune_core)
+target_compile_definitions(Retune PRIVATE RETUNE_VERSION_STRING="${PROJECT_VERSION}"
+    $<$<BOOL:${RETUNE_DIALECT_LOG}>:RETUNE_DIALECT_LOG>)
+set_target_properties(Retune PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    target_compile_options(Retune PRIVATE -Wall -Wextra)
+endif()
+
+if(APPLE)
+    set_target_properties(Retune PROPERTIES
+        BUNDLE TRUE
+        BUNDLE_EXTENSION "clap"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.unlikelyware.retune"
+        MACOSX_BUNDLE_BUNDLE_NAME "Retune"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+    set(RETUNE_CLAP_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/CLAP")
+    set(RETUNE_CLAP_ARTIFACT "$<TARGET_BUNDLE_DIR:Retune>")
+else()
+    set_target_properties(Retune PROPERTIES PREFIX "" SUFFIX ".clap")
+    set(RETUNE_CLAP_DIR "$ENV{HOME}/.clap")
+    set(RETUNE_CLAP_ARTIFACT "$<TARGET_FILE:Retune>")
+endif()
+
+# A separate target, as in the synths, so an ordinary build never writes outside the build tree.
+add_custom_target(install-clap
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${RETUNE_CLAP_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${RETUNE_CLAP_DIR}/Retune.clap"
+    COMMAND ${CMAKE_COMMAND} -E create_symlink "${RETUNE_CLAP_ARTIFACT}" "${RETUNE_CLAP_DIR}/Retune.clap"
+    DEPENDS Retune
+    VERBATIM
+    COMMENT "Symlinking Retune.clap into ${RETUNE_CLAP_DIR}")
+
 # --- tests -------------------------------------------------------------------------------------
 include(CTest)
 if(BUILD_TESTING)
     add_executable(retune-core-tests test/RetuneCoreTests.cpp)
     target_link_libraries(retune-core-tests PRIVATE retune_core)
     add_test(NAME retune-core COMMAND retune-core-tests)
+
+    # Drives the built .clap over the CLAP C API: no DAW, no GUI.
+    add_executable(retune-clap-tests test/RetuneClapTests.cpp)
+    target_include_directories(retune-clap-tests PRIVATE external/clap/include)
+    target_link_libraries(retune-clap-tests PRIVATE uw::ump ${CMAKE_DL_LIBS})
+    add_dependencies(retune-clap-tests Retune)
+    add_test(NAME retune-clap COMMAND retune-clap-tests "${RETUNE_CLAP_ARTIFACT}")
 endif()

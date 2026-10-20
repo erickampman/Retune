@@ -2,6 +2,8 @@
 
 ## Tests
 - all: cmake -S . -B build -G Ninja && ninja -C build && ctest --test-dir build --output-on-failure
+- validator: clap-validator validate build/Retune.clap (34 pass, 10 skipped: no presets, audio ports or CLAP dialect)
+- install: ninja -C build install-clap (symlinks Retune.clap into the user CLAP folder)
 
 ## M0: Plan
 - [x] PLAN.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
@@ -22,11 +24,12 @@
 - [x] Table-driven tests: both protocols, with and without an incoming pitch attribute, held-note parameter change, several N values
 
 ## M2: Raw CLAP plugin
-- [ ] clap_entry, note-effect feature, note ports in + out (MIDI | MIDI2, prefer MIDI2)
-- [ ] Three parameters, state save/load, clap-validator clean
-- [ ] Headless host test: MIDI 1.0 and MIDI 2.0 in, output events checked
-- [ ] Debug dialect log: host `supported_dialects()` and incoming event types (Bitwig, REAPER)
-- [ ] Heard through StageHand → Retune → StruckSynth
+- [x] clap_entry, note-effect feature, note ports in + out (MIDI | MIDI2, prefer MIDI2)
+- [x] Three parameters, state save/load, clap-validator clean
+- [x] Headless host test: MIDI 1.0 and MIDI 2.0 in, output events checked
+- [x] Dialect log (`-DRETUNE_DIALECT_LOG=ON`): host `supported_dialects()` and incoming event counts, to ~/Library/Logs/Retune-dialects.log
+- [ ] Dialect log run in Bitwig (MIDI 2.0 controller) and REAPER
+- [ ] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below)
 
 ## M3: Other formats (clap-wrapper)
 - [ ] AUv2 / AUv3 (`aumi`), VST3: MIDI 1.0 (rounded) behaviour
