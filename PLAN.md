@@ -35,8 +35,8 @@ would take wrapper patches (see the last phase).
 ## Behaviour
 
 - **Parameters** (appended, never inserted, as in the synths):
-  - 0 `Divisions`: N, the number of equal steps per octave. Integer, 1 … 96 (TBD), default 12.
-  - 1 `Octaves`: integer, −4 … +4 (TBD), default 0.
+  - 0 `Divisions`: N, the number of equal steps per octave. Integer, 1 … 96, default 12.
+  - 1 `Octaves`: integer, −4 … +4, default 0.
   - 2 `Steps`: integer, limited to −N … +N, default 0. Steps of 1/N octave; Octaves covers anything
     larger. CLAP parameter ranges are fixed, so the host sees −96 … +96 (max N), and Retune uses
     `clamp(Steps, −N, +N)`. Lowering N therefore clamps the shift at once, and the GUI shows the
@@ -134,4 +134,3 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 - **CLAP-dialect output.** For a host that only speaks CLAP note events, should the fraction be sent
   as a `CLAP_NOTE_EXPRESSION_TUNING` after each Note On, or rounded like MIDI 1.0?
-- **Parameter ranges.** Is max N = 96 right? Octaves ±4?
