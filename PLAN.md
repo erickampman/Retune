@@ -1,6 +1,6 @@
 # Retune — plan
 
-A MIDI-in → MIDI-out note effect that transposes every note by a fixed amount in **cents**.
+A MIDI-in → MIDI-out note effect that transposes every note by a fixed interval in an **equal division of the octave** (N-EDO).
 It is CLAP-first, with the same layout as StruckSynth and PlainOldSynth: a hand-written raw CLAP entry
 point and the vendored free-audio **clap-wrapper** for the other formats.
 
@@ -12,7 +12,7 @@ before phase 1 starts.
 
 | Question | Answer |
 |---|---|
-| Kind of shift | Fixed transpose in cents (one amount, may be fractional) |
+| Kind of shift | Fixed transpose by an interval of an equal division of the octave (EDO): octaves + steps of 1/N octave |
 | MIDI 1.0 output, fractional pitch | Round to the nearest semitone |
 | MIDI 2.0 output, fractional pitch | Note On attribute type 3, **Pitch 7.9** |
 | Form | Plugin. CLAP first, then the other formats clap-wrapper supports for MIDI→MIDI |
@@ -34,19 +34,23 @@ would take wrapper patches (see the last phase).
 
 ## Behaviour
 
-- **Parameter 0, `Transpose`**: cents, −2400 … +2400, default 0. Parameters are appended, never
-  inserted, as in the synths.
+- **Parameters** (appended, never inserted, as in the synths):
+  - 0 `Divisions`: N, the number of equal steps per octave. Integer, 1 … 96 (TBD), default 12.
+  - 1 `Octaves`: integer, −4 … +4 (TBD), default 0.
+  - 2 `Steps`: integer, −N … +N (TBD), default 0. Steps of 1/N octave.
+- **Shift** in semitones = `12 × Octaves + 12 × Steps / N` (in cents: `1200 × Octaves + 1200 × Steps / N`).
+  With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
 - **Output format follows the input format.** An event that arrives as MIDI 1.0 (or a CLAP note event)
   leaves as MIDI 1.0 or a CLAP note event. An event that arrives as MIDI 2.0 leaves as MIDI 2.0.
-- **MIDI 1.0 path**: `outKey = inKey + round(cents / 100)`.
+- **MIDI 1.0 path**: `outKey = inKey + round(shift)`.
 - **MIDI 2.0 path**: take the Note On's pitch as 7.9 (from its attribute if it has type 3, otherwise
-  `key << 9`), add `cents × 512 / 100`, and write it back as attribute type 3. `outKey` is the
+  `key << 9`), add `round(shift × 512)`, and write it back as attribute type 3. `outKey` is the
   integer part, so a receiver that ignores the attribute still plays the nearest note below.
   Rounding to 1/512 semitone (≈0.2 cent) is fine.
 - **Latching**: each sounding note remembers its output key (and 7.9 pitch), keyed by
   group/port + channel + input key (and CLAP note id). Note Off, poly pressure and every MIDI 2.0
   per-note message (per-note CC, per-note pitch bend, per-note management) use the latched key. So
-  a Transpose change while notes are held cannot leave a stuck note, and only new notes take the new
+  a parameter change while notes are held cannot leave a stuck note, and only new notes take the new
   value.
 - **Out of range** (the result is below 0 or above 127): drop the Note On and its matching Note Off and
   per-note messages.
@@ -73,7 +77,7 @@ and reused later if a CoreMIDI app or another plugin wants it.
 
 1. **Core library + tests.** Transpose rules, Pitch 7.9 maths, latching, out-of-range drop,
    pass-through. Table-driven tests for MIDI 1.0, MIDI 2.0 (with and without an incoming pitch
-   attribute), held-note Transpose change, and per-note message remapping.
+   attribute), held-note parameter change, several N values, and per-note message remapping.
 2. **Raw CLAP plugin.** Features `note-effect` (+ `utility`). One note input port and one note output
    port. Both advertise `CLAP | MIDI | MIDI2` and prefer `MIDI2`. Parameter + state save/load, and
    `clap-validator` clean. A headless host test (like `ss-clap`) sends MIDI 1.0, MIDI 2.0 and CLAP
@@ -86,8 +90,8 @@ and reused later if a CoreMIDI app or another plugin wants it.
      the host negotiated MIDI 2.0.
    - VST3: set `noteOn.tuning` from a CLAP tuning note expression or a 7.9 pitch.
    These go in our vendored copy, and possibly upstream.
-5. **GUI** (DPF/NanoVG, as in the synths). A single Transpose control: semitones + cents, or one
-   cents knob. Ask before anything UI-visible.
+5. **GUI** (DPF/NanoVG, as in the synths). Three controls: Divisions, Octaves, Steps (plus a read-out of
+   the resulting cents). Ask before anything UI-visible.
 
 ## StageHand: the main host
 
@@ -126,6 +130,10 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 - **CLAP-dialect output.** For a host that only speaks CLAP note events, should the fraction be sent
   as a `CLAP_NOTE_EXPRESSION_TUNING` after each Note On, or rounded like MIDI 1.0?
-- **Transpose range.** Is ±2400 cents (±2 octaves) right?
+- **Parameter ranges.** Max N? Octaves ±4? Should Steps be limited to ±N (Octaves covers the rest)
+  or allowed wider? If N is lowered below |Steps|, clamp or keep?
+- **Fixed shift vs. keyboard mapping.** Assumed: every note moves by the same EDO interval (the
+  incoming keys stay 12-TET). Alternative: map each incoming key to one N-EDO step, so the keyboard
+  plays N-EDO. Confirm the first.
 - **Source control.** This folder is not a git repo yet. Should it get `git init`, and is a GitHub
   remote wanted?
