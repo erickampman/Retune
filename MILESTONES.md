@@ -1,7 +1,8 @@
 # Retune milestones
 
 ## Tests
-- none yet (phase 1 adds: ninja -C build && ctest --test-dir build --output-on-failure)
+- all: cmake -S . -B build -G Ninja && ninja -C build && ctest --test-dir build --output-on-failure
+- until the uw-core pin moves, configure with `-DRETUNE_UW_CORE_DIR=$HOME/Dev-Common/uw-core`
 
 ## M0: Plan
 - [x] PLAN.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
@@ -11,13 +12,14 @@
 - [ ] CLAP note dialect: decide after the dialect log (M2) shows what Bitwig sends
 
 ## M1: Core library
-- [ ] uw-core: fractional Pitch 7.9 transpose in uw::ump, with tests (pushed before the pin)
-- [ ] CMake skeleton, external/clap and external/uw-core (UMP-only) submodules, ctest
-- [ ] RetuneCore: shift maths (12 × Octaves + 12 × Steps / N), Pitch 7.9 read/write
-- [ ] MIDI 1.0 path (rounded) and MIDI 2.0 path (attribute type 3)
-- [ ] Latch table: Note Off, poly pressure and MIDI 2.0 per-note messages use the latched key
-- [ ] Out-of-range drop, pass-through of everything else, All Notes Off / reset clear the latch
-- [ ] Table-driven tests: both protocols, with and without an incoming pitch attribute, held-note parameter change, several N values
+- [ ] uw-core: `notePitch79` / `transposeNote79` in uw::ump, with tests: written and passing, not yet committed or pushed; then move the pin
+- [x] CMake skeleton, external/clap and external/uw-core (UMP-only) submodules, ctest
+- [x] RetuneCore: shift maths (12 × Octaves + 12 × Steps / N), Pitch 7.9 read/write
+- [x] MIDI 1.0 path (rounded) and MIDI 2.0 path (attribute type 3)
+- [x] Latch table: Note Off, poly pressure and MIDI 2.0 per-note messages use the latched key
+- [x] Out-of-range drop, pass-through of everything else, All Notes Off / reset clear the latch
+- [x] Retrigger ends the old output key; unlatched Note Off / per-note messages follow the current shift
+- [x] Table-driven tests: both protocols, with and without an incoming pitch attribute, held-note parameter change, several N values
 
 ## M2: Raw CLAP plugin
 - [ ] clap_entry, note-effect feature, note ports in + out (MIDI | MIDI2, prefer MIDI2)

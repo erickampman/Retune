@@ -4,9 +4,8 @@ A MIDI-in → MIDI-out note effect that transposes every note by a fixed interva
 It is CLAP-first, with the same layout as StruckSynth and PlainOldSynth: a hand-written raw CLAP entry
 point and the vendored free-audio **clap-wrapper** for the other formats.
 
-**Status (2026-10-19): on hold, waiting for the author's review.** No code is written yet. The
-decisions below were made in the first planning session. The open questions at the end need answers
-before phase 1 starts.
+**Status (2026-10-20):** reviewed with the author; phase 1 (the core library) is written and its tests
+pass. Its uw-core helper waits to be committed and pinned (MILESTONES.md, M1).
 
 ## Decisions so far
 
@@ -61,7 +60,13 @@ would take wrapper patches (see the last phase).
   per-note messages.
 - **Everything else** (CCs, channel pitch bend, program change, SysEx, clock) passes through
   unchanged, at its original sample offset.
-- All Notes Off / All Sound Off / host `reset()` clear the latch table.
+- All Notes Off / All Sound Off clear that group and channel's latches; host `reset()` clears them all.
+- **Retrigger:** a Note On for a key that is already sounding, whose new output key differs (or is out
+  of range), first sends a Note Off for the old output key, so it can't hang.
+- **Unlatched** Note Off or per-note message (its Note On came before a reset, or before Retune
+  started): it moves to the key the current shift would give a Note On (MIDI 1.0: rounded; MIDI 2.0:
+  the integer part).
+- A MIDI 2.0 Note On's manufacturer- or profile-specific attribute is replaced by the Pitch 7.9 one.
 
 ## Layout (mirrors StruckSynth)
 
