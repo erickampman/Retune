@@ -69,18 +69,33 @@ would take wrapper patches (see the last phase).
 Retune/
   CMakeLists.txt         raw .clap MODULE target, install-clap symlink target, ctest
   external/clap          submodule
+  external/uw-core       submodule, UMP-only build (UW_CORE_UMP_ONLY): uw::ump
   external/clap-wrapper  submodule (phase 3)
-  src/RetuneCore.{h,cpp} pure C++, no CLAP: UMP / MIDI 1.0 in → out, latch table
+  src/RetuneCore.{h,cpp} pure C++, no CLAP: shift maths, latch table, over uw::MidiMessage
   src/plugin.cpp         clap_entry, note ports (in + out), params, state
   test/                  core unit tests + a headless host test that dlopens the .clap
 ```
 
-The core is a plain library over a small event struct, so it can be unit-tested without a host,
+The core is a plain library over `uw::MidiMessage`, so it can be unit-tested without a host,
 and reused later if a CoreMIDI app or another plugin wants it.
+
+**UMP code comes from uw-core** (`~/Dev-Common/uw-core`, `uw::ump`), as in StageHand, KeyboardEDO
+and StruckKit (UmpireDAW `docs/decisions.md`, "Shared code"). Retune writes no UMP parsing of its
+own: message classification, MIDI 1.0 ↔ 2.0, MIDI 1.0 bytes and the Pitch 7.9 attribute all come
+from `uw::ump`. What is about UMP itself goes into uw-core; what is about Retune (parameters, shift,
+latch table) stays here.
+
+- **Fractional transpose goes into `uw::ump`.** `transposeNote(m, semitones)` moves a note and its
+  Pitch 7.9 attribute by whole semitones only. Add a fractional version to uw-core, e.g.
+  `transposeNote79(m, delta)` with `delta` in 1/512 semitone: it adds to the 7.9 pitch (from the
+  attribute, or `key << 9`), writes attribute type 3, sets the key to the integer part, and fails
+  when the result is out of range. Commit and push uw-core first, with its own tests, then move
+  Retune's pin (uw-core's README, "Pushing: uw-core first").
 
 ## Phases
 
-1. **Core library + tests.** Transpose rules, Pitch 7.9 maths, latching, out-of-range drop,
+1. **Core library + tests.** uw-core submodule (UMP-only) and the fractional 7.9 transpose in
+   `uw::ump` (step 1a, in uw-core). Then transpose rules, Pitch 7.9 maths, latching, out-of-range drop,
    pass-through. Table-driven tests for MIDI 1.0, MIDI 2.0 (with and without an incoming pitch
    attribute), held-note parameter change, several N values, and per-note message remapping.
 2. **Raw CLAP plugin.** Features `note-effect` (+ `utility`). One note input port and one note output

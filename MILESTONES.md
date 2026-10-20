@@ -7,10 +7,12 @@
 - [x] PLAN.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
 - [x] Parameters: Divisions (1–96), Octaves (±4), Steps (clamped to ±N)
 - [x] Private repo erickampman/Retune
+- [x] UMP code from uw-core's uw::ump, not Retune's own
 - [ ] CLAP note dialect: decide after the dialect log (M2) shows what Bitwig sends
 
 ## M1: Core library
-- [ ] CMake skeleton, external/clap submodule, ctest
+- [ ] uw-core: fractional Pitch 7.9 transpose in uw::ump, with tests (pushed before the pin)
+- [ ] CMake skeleton, external/clap and external/uw-core (UMP-only) submodules, ctest
 - [ ] RetuneCore: shift maths (12 × Octaves + 12 × Steps / N), Pitch 7.9 read/write
 - [ ] MIDI 1.0 path (rounded) and MIDI 2.0 path (attribute type 3)
 - [ ] Latch table: Note Off, poly pressure and MIDI 2.0 per-note messages use the latched key
