@@ -15,6 +15,7 @@ before phase 1 starts.
 | Kind of shift | Fixed transpose by an interval of an equal division of the octave (EDO): octaves + steps of 1/N octave. Every note moves by the same interval; the keyboard stays 12-TET (no key → N-EDO mapping) |
 | MIDI 1.0 output, fractional pitch | Round to the nearest semitone |
 | MIDI 2.0 output, fractional pitch | Note On attribute type 3, **Pitch 7.9** |
+| Base case | **MIDI 2.0.** MIDI 1.0 is supported (rounded). The CLAP note dialect is **TBD** (see below) |
 | Form | Plugin. CLAP first, then the other formats clap-wrapper supports for MIDI→MIDI |
 
 ## What clap-wrapper does with a note effect (checked in PlainOldSynth's copy, v0.16.0)
@@ -44,8 +45,8 @@ would take wrapper patches (see the last phase).
     host automation.
 - **Shift** in semitones = `12 × Octaves + 12 × Steps / N` (in cents: `1200 × Octaves + 1200 × Steps / N`).
   With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
-- **Output format follows the input format.** An event that arrives as MIDI 1.0 (or a CLAP note event)
-  leaves as MIDI 1.0 or a CLAP note event. An event that arrives as MIDI 2.0 leaves as MIDI 2.0.
+- **Output format follows the input format.** An event that arrives as MIDI 1.0 leaves as MIDI 1.0.
+  An event that arrives as MIDI 2.0 leaves as MIDI 2.0. (CLAP note events: TBD.)
 - **MIDI 1.0 path**: `outKey = inKey + round(shift)`.
 - **MIDI 2.0 path**: take the Note On's pitch as 7.9 (from its attribute if it has type 3, otherwise
   `key << 9`), add `round(shift × 512)`, and write it back as attribute type 3. `outKey` is the
@@ -83,9 +84,10 @@ and reused later if a CoreMIDI app or another plugin wants it.
    pass-through. Table-driven tests for MIDI 1.0, MIDI 2.0 (with and without an incoming pitch
    attribute), held-note parameter change, several N values, and per-note message remapping.
 2. **Raw CLAP plugin.** Features `note-effect` (+ `utility`). One note input port and one note output
-   port. Both advertise `CLAP | MIDI | MIDI2` and prefer `MIDI2`. Parameter + state save/load, and
-   `clap-validator` clean. A headless host test (like `ss-clap`) sends MIDI 1.0, MIDI 2.0 and CLAP
-   note events and checks the output events. Then listen through StageHand → Retune → StruckSynth
+   port. Both advertise `MIDI | MIDI2` and prefer `MIDI2` (`CLAP` TBD). Parameter + state save/load,
+   and `clap-validator` clean. A headless host test (like `ss-clap`) sends MIDI 1.0 and MIDI 2.0 and
+   checks the output events. A debug build logs the host's `supported_dialects()` and the type of every
+   incoming note event, to find out what Bitwig, REAPER etc. actually send. Then listen through StageHand → Retune → StruckSynth
    (which already plays 7.9 pitch).
 3. **AUv2 / AUv3 / VST3 via clap-wrapper**, MIDI 1.0 (rounded) behaviour only. Check them in Logic
    (AU MIDI FX slot), REAPER and Bitwig. VST3 loading as an "instrument" is a known limitation.
@@ -132,5 +134,8 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 ## Open questions
 
-- **CLAP-dialect output.** For a host that only speaks CLAP note events, should the fraction be sent
-  as a `CLAP_NOTE_EXPRESSION_TUNING` after each Note On, or rounded like MIDI 1.0?
+- **CLAP note dialect: TBD.** MIDI 2.0 is the base case, so CLAP note events are left out for now.
+  If they are added later: send the fraction as a `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right
+  after the Note On), add it to any tuning expression the host already sends for that note, and
+  remap the key/note_id of other note expressions from the latch table. Decide after the dialect log
+  shows what Bitwig sends a note effect when a MIDI 2.0 controller is plugged in.
