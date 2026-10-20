@@ -4,8 +4,8 @@ A MIDI-in → MIDI-out note effect that transposes every note by a fixed interva
 It is CLAP-first, with the same layout as StruckSynth and PlainOldSynth: a hand-written raw CLAP entry
 point and the vendored free-audio **clap-wrapper** for the other formats.
 
-**Status (2026-10-20):** reviewed with the author; phase 1 (the core library) is written and its tests
-pass. Its uw-core helper waits to be committed and pinned (MILESTONES.md, M1).
+**Status (2026-10-20):** phase 1 (the core library) is done: RetuneCore over uw-core's uw::ump, with
+tests. Next is phase 2, the raw CLAP plugin.
 
 ## Decisions so far
 
@@ -67,6 +67,8 @@ would take wrapper patches (see the last phase).
   started): it moves to the key the current shift would give a Note On (MIDI 1.0: rounded; MIDI 2.0:
   the integer part).
 - A MIDI 2.0 Note On's manufacturer- or profile-specific attribute is replaced by the Pitch 7.9 one.
+- **Pitch 7.25** (registered per-note controller 3) is an absolute pitch: on a latched note it moves to
+  the latched key and its value moves by the Note On's full shift, fraction included.
 
 ## Layout (mirrors StruckSynth)
 
@@ -94,7 +96,9 @@ latch table) stays here.
   Pitch 7.9 attribute by whole semitones only. Add a fractional version to uw-core, e.g.
   `transposeNote79(m, delta)` with `delta` in 1/512 semitone: it adds to the 7.9 pitch (from the
   attribute, or `key << 9`), writes attribute type 3, sets the key to the integer part, and fails
-  when the result is out of range. Commit and push uw-core first, with its own tests, then move
+  when the result is out of range. Done as `transposeNote79` (uw-core 89dd48e), with
+  `notePitch79` and `transposePitch725`, which moves a Pitch 7.25 value (registered per-note
+  controller 3, absolute pitch) by the same units. Commit and push uw-core first, with its own tests, then move
   Retune's pin (uw-core's README, "Pushing: uw-core first").
 
 ## Phases

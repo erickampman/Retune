@@ -160,6 +160,27 @@ void testPerNoteMessages() {
     CHECK(is(run(m1, 0x20A03C50), 0x20A03F50));             // MIDI 1.0 poly pressure
 }
 
+// A host's Pitch 7.25 (registered per-note controller 3) on a shifted note moves by the note's
+// full shift, not only its whole-semitone key change.
+void testPitch725() {
+    RetuneCore third = make(36, 0, 1);                      // +171/512: key stays 60
+    CHECK(run(third, 0x40903C00, 0x8000'0000).size() == 1);
+    CHECK(is(run(third, 0x40003C03, 60u << 25), 0x40003C03, (60u << 25) + (171u << 16)));
+
+    RetuneCore up = make(36, 0, 20);                        // +3413/512: key 66
+    CHECK(run(up, 0x40903C00, 0x8000'0000).size() == 1);
+    up.setParams({12, 0, 0});                               // latched: the change doesn't apply
+    const std::uint32_t v = (60u << 25) | (1u << 24);       // 60.5
+    CHECK(is(run(up, 0x40003C03, v), 0x40004203, v + (3413u << 16)));
+
+    RetuneCore unlatched = make(36, 0, -20);                // -3413/512: key 53 (floor)
+    CHECK(is(run(unlatched, 0x40003C03, 60u << 25), 0x40003503, (60u << 25) - (3413u << 16)));
+
+    RetuneCore m1 = make(12, 0, 2);                         // MIDI 1.0 Note On: shift 2 × 512
+    CHECK(run(m1, 0x20903C64).size() == 1);
+    CHECK(is(run(m1, 0x40003C03, 60u << 25), 0x40003E03, 62u << 25));
+}
+
 void testRetrigger() {
     RetuneCore core = make(12, 0, 2);
     CHECK(is(run(core, 0x20903C64), 0x20903E64));          // 60 -> 62
@@ -263,6 +284,7 @@ int main() {
     testMidi2();
     testHeldNoteParamChange();
     testPerNoteMessages();
+    testPitch725();
     testRetrigger();
     testOutOfRange();
     testPassThrough();

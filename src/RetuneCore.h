@@ -48,7 +48,8 @@ public:
 
     // Transpose one message. MIDI 1.0 notes (MT 0x2) move by shiftSemitones(); MIDI 2.0 notes
     // (MT 0x4) move by shift79() and leave with a Pitch 7.9 attribute. Note Off, poly pressure
-    // and MIDI 2.0 per-note messages follow their Note On's latched key. A note whose result
+    // and MIDI 2.0 per-note messages follow their Note On's latched key, and a Pitch 7.25 value
+    // moves by the Note On's full shift, fraction included. A note whose result
     // leaves 0..127 is dropped, with everything that follows it. All Sound Off (CC 120) and All
     // Notes Off (CC 123) clear that channel's latches; everything else passes through
     // unchanged. Writes at most kMaxOut messages to `out`; returns the count.
@@ -60,13 +61,16 @@ public:
 private:
     enum class Latch : std::uint8_t { None, Sounding, Dropped };
     struct Entry {
-        Latch        state  = Latch::None;
-        std::uint8_t outKey = 0;
+        Latch        state   = Latch::None;
+        std::uint8_t outKey  = 0;
+        std::int16_t shift79 = 0;   // the pitch shift the Note On got, for a Pitch 7.25 value
     };
 
     Entry& entry(const uw::MidiMessage& m) noexcept;
     bool   transposeNoteOn(uw::MidiMessage& m) const noexcept;
     int    unlatchedKeyShift(const uw::MidiMessage& m) const noexcept;
+    int    pitchShift(const uw::MidiMessage& m) const noexcept;
+    bool   moveToKey(uw::MidiMessage& m, int keyShift, int shift79) const noexcept;
 
     Params params_;
     int    shift79_        = 0;

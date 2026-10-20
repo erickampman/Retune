@@ -25,6 +25,12 @@ bool isPerNote(const uw::MidiMessage& m) noexcept {
             s == ump::Status::PerNotePitchBend || s == ump::Status::PerNoteManagement);
 }
 
+// A Pitch 7.25: registered per-note controller 3, an absolute pitch.
+bool isPitch725(const uw::MidiMessage& m) noexcept {
+    return ump::messageType(m) == ump::MessageType::Midi2ChannelVoice &&
+           ump::status(m) == ump::Status::RegisteredPerNoteController && (m.words[0] & 0xFF) == 3;
+}
+
 // All Sound Off (CC 120) or All Notes Off (CC 123); the controller index sits in the same
 // bits in MT 0x2 and MT 0x4.
 bool isAllNotesOff(const uw::MidiMessage& m) noexcept {
@@ -81,6 +87,19 @@ int RetuneCore::unlatchedKeyShift(const uw::MidiMessage& m) const noexcept {
     return shift79_ >= 0 ? shift79_ / 512 : -((-shift79_ + 511) / 512);
 }
 
+int RetuneCore::pitchShift(const uw::MidiMessage& m) const noexcept {
+    return ump::messageType(m) == ump::MessageType::Midi2ChannelVoice ? shift79_
+                                                                       : shiftSemitones_ * 512;
+}
+
+bool RetuneCore::moveToKey(uw::MidiMessage& m, int keyShift, int shift79) const noexcept {
+    if (!ump::transposeNote(m, keyShift)) return false;
+    // transposeNote moved a Pitch 7.25 value by whole semitones with its key; add the fraction
+    // so the value moves by the note's full shift.
+    if (isPitch725(m)) return ump::transposePitch725(m, shift79 - keyShift * 512);
+    return true;
+}
+
 std::size_t RetuneCore::process(const uw::MidiMessage& in, uw::MidiMessage* out) noexcept {
     if (!ump::isChannelVoice(in)) {
         out[0] = in;
@@ -104,10 +123,10 @@ std::size_t RetuneCore::process(const uw::MidiMessage& in, uw::MidiMessage* out)
             out[n++] = off;
         }
         if (!inRange) {
-            e = {Latch::Dropped, 0};
+            e = {Latch::Dropped, 0, 0};
             return n;
         }
-        e = {Latch::Sounding, ump::noteNumber(m)};
+        e = {Latch::Sounding, ump::noteNumber(m), static_cast<std::int16_t>(pitchShift(in))};
         out[n++] = m;
         return n;
     }
@@ -118,7 +137,7 @@ std::size_t RetuneCore::process(const uw::MidiMessage& in, uw::MidiMessage* out)
         bool keep = true;
         switch (e.state) {
             case Latch::Sounding:
-                keep = ump::transposeNote(m, e.outKey - ump::noteNumber(in));
+                keep = moveToKey(m, e.outKey - ump::noteNumber(in), e.shift79);
                 break;
             case Latch::Dropped:
                 keep = false;
@@ -126,7 +145,7 @@ std::size_t RetuneCore::process(const uw::MidiMessage& in, uw::MidiMessage* out)
             case Latch::None:
                 // No Note On seen (it came before a reset, or before Retune started): guess the
                 // key the current shift would have given it.
-                keep = ump::transposeNote(m, unlatchedKeyShift(in));
+                keep = moveToKey(m, unlatchedKeyShift(in), pitchShift(in));
                 break;
         }
         if (ump::isNoteOff(in)) e = Entry{};
