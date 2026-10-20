@@ -132,5 +132,3 @@ AU/VST3 wrappers (phase 3) move down the list.
   as a `CLAP_NOTE_EXPRESSION_TUNING` after each Note On, or rounded like MIDI 1.0?
 - **Parameter ranges.** Max N? Octaves ±4? Should Steps be limited to ±N (Octaves covers the rest)
   or allowed wider? If N is lowered below |Steps|, clamp or keep?
-- **Source control.** This folder is not a git repo yet. Should it get `git init`, and is a GitHub
-  remote wanted?
