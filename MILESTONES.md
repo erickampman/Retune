@@ -28,7 +28,8 @@
 - [x] Three parameters, state save/load, clap-validator clean
 - [x] Headless host test: MIDI 1.0 and MIDI 2.0 in, output events checked
 - [x] Dialect log (`-DRETUNE_DIALECT_LOG=ON`): host `supported_dialects()` and incoming event counts, to ~/Library/Logs/Retune-dialects.log
-- [ ] Dialect log run in Bitwig (MIDI 2.0 controller) and REAPER
+- [x] Dialect log in Bitwig 6.1.3: host dialects CLAP | MIDI | MIDI_MPE (no MIDI2); Retune got MIDI 1.0 only
+- [ ] Dialect log in REAPER
 - [ ] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below)
 
 ## M3: Other formats (clap-wrapper)
