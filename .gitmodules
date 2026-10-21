@@ -7,6 +7,7 @@
 [submodule "external/clap-wrapper"]
 	path = external/clap-wrapper
 	url = https://github.com/free-audio/clap-wrapper.git
+	ignore = dirty
 [submodule "external/vst3sdk"]
 	path = external/vst3sdk
 	url = https://github.com/steinbergmedia/vst3sdk.git
