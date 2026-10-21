@@ -38,7 +38,7 @@
 - [x] Latch by note_id too; Note Off / choke / other expressions follow the latched key
 - [x] A host's own tuning expression on a shifted note gets the fraction added
 - [x] Headless host test for CLAP note events; clap-validator's CLAP note tests run
-- [ ] Heard in Bitwig with a synth that honours tuning expressions, at 36-EDO
+- [x] Heard in Bitwig with a synth that honours tuning expressions, at 36-EDO (2026-10-21: changing Steps does the right thing)
 
 ## M4: Other formats (clap-wrapper)
 - [ ] AUv2 / AUv3 (`aumi`), VST3: MIDI 1.0 (rounded) behaviour
