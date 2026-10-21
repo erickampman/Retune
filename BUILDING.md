@@ -25,13 +25,19 @@ No JACK, ALSA, CoreAudio or CoreMIDI is needed: Retune builds uw-core with
 git clone https://github.com/erickampman/Retune.git
 cd Retune
 git submodule update --init
-git -C external/vst3sdk submodule update --init
+git -C external/vst3sdk submodule update --init base cmake pluginterfaces public.sdk
 ```
 
 If you already cloned without the submodules, the folders under `external/` are empty and CMake
-fails at `add_subdirectory`. Run the two commands above to fix it. The VST3 SDK needs its own
-submodules (`base`, `pluginterfaces`, `public.sdk` …). uw-core's don't matter: they are only used
-outside the UMP-only build, so `--recursive` isn't needed.
+fails at `add_subdirectory`. Run the two commands above to fix it. A plain
+`git submodule update --init` leaves the VST3 SDK's own submodules empty, and clap-wrapper then
+stops with "There is no VST3 SDK at …/external/vst3sdk". The second command fetches the four the
+build uses. `--recursive` works too, but it also downloads VSTGUI, the SDK tutorials and its docs,
+which Retune doesn't use.
+
+After a `git pull` that moves a submodule pin, run `git submodule update` (or pull with
+`--recurse-submodules`). Otherwise `git status` shows the submodule as modified and the build uses
+the old pin.
 
 ## Build and test
 
@@ -52,7 +58,7 @@ Release build: add `-DCMAKE_BUILD_TYPE=Release` to the first command.
 
 | Option | Default | Makes |
 |---|---|---|
-| `RETUNE_BUILD_VST3` | ON | `build/Retune.vst3` |
+| `RETUNE_BUILD_VST3` | ON | macOS: `build/Retune.vst3`. Linux: `build/Release/Retune.vst3` (`Debug/` in a Debug build) |
 | `RETUNE_BUILD_AUV2` | ON on macOS, OFF elsewhere | `build/Retune.component` (type `aumi`, subtype `Rtun`, manufacturer `nLKL`) |
 
 On its first configure, the AUv2 build downloads Apple's AudioUnitSDK (clap-wrapper does this with
@@ -109,8 +115,9 @@ When the change is ready, push uw-core first, then move Retune's submodule pin
 
 ## Checked so far
 
-- **Linux:** GCC 15.2, Ninja: core and plugin build, both tests pass (2026-10-21). The VST3 build
-  (M4) isn't checked on Linux yet.
+- **Linux:** GCC 15.2, Ninja (2026-10-21): the CLAP and VST3 builds work and both tests pass;
+  `install-clap` and `install-vst3` link into `~/.clap` and `~/.vst3`. Retune runs in StageHand.
+  The VST3 isn't checked in a Linux host yet.
 - **macOS:** Xcode 26.3 (Apple Clang), Ninja (2026-10-21):
   - the CLAP, VST3 and AUv2 builds have no warnings, and both tests pass;
   - clap-validator: 35 pass, 0 fail;

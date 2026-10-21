@@ -117,7 +117,9 @@ if(RETUNE_BUILD_VST3)
         set(RETUNE_VST3_ARTIFACT "$<TARGET_BUNDLE_DIR:Retune_vst3>")
     else()
         set(RETUNE_VST3_DIR "$ENV{HOME}/.vst3")
-        set(RETUNE_VST3_ARTIFACT "$<TARGET_FILE:Retune_vst3>")
+        # The bundle folder, not the .so inside it. clap-wrapper puts it in Debug/ or Release/
+        # (wrap_vst3.cmake, v3root_dor).
+        set(RETUNE_VST3_ARTIFACT "${CMAKE_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>/Retune.vst3")
     endif()
     add_custom_target(install-vst3
         COMMAND ${CMAKE_COMMAND} -E make_directory "${RETUNE_VST3_DIR}"
