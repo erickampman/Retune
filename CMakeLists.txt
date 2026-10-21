@@ -30,7 +30,7 @@ endif()
 option(RETUNE_DIALECT_LOG "Log the host's note dialects and incoming note events (diagnostic)" OFF)
 
 set_target_properties(retune_core PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
-add_library(Retune MODULE src/plugin.cpp)
+add_library(Retune MODULE src/plugin.cpp src/ClapNotes.cpp)
 target_include_directories(Retune PRIVATE external/clap/include)
 target_link_libraries(Retune PRIVATE retune_core)
 target_compile_definitions(Retune PRIVATE RETUNE_VERSION_STRING="${PROJECT_VERSION}"

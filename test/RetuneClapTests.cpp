@@ -1,7 +1,8 @@
 // RetuneClapTests: drives the built Retune.clap through the CLAP C API, with no DAW: dlopen,
 // clap_entry, factory, then MIDI 1.0 and MIDI 2.0 events in and the output events checked.
 // RetuneCoreTests covers the transpose rules; this covers the CLAP side: the descriptor, note
-// ports and dialects, parameters (events, flush, text), state, sample offsets and reset.
+// ports and dialects, parameters (events, flush, text), state, sample offsets and reset, and the
+// CLAP note dialect (ClapNotes), which has no UMP form.
 //
 // Usage: retune-clap-tests /path/to/Retune.clap. Silent unless a check fails.
 
@@ -9,6 +10,7 @@
 
 #include <dlfcn.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -83,6 +85,23 @@ struct Input {
         ev.data[0] = w0; ev.data[1] = w1;
         add(ev.header);
     }
+    void note(uint16_t type, uint32_t time, int32_t noteId, int16_t channel, int16_t key,
+              double velocity = 0.8) {
+        clap_event_note_t ev{};
+        ev.header   = {sizeof(ev), time, CLAP_CORE_EVENT_SPACE_ID, type, 0};
+        ev.note_id  = noteId; ev.port_index = 0; ev.channel = channel; ev.key = key;
+        ev.velocity = velocity;
+        add(ev.header);
+    }
+    void expression(uint32_t time, clap_note_expression id, int32_t noteId, int16_t channel,
+                    int16_t key, double value) {
+        clap_event_note_expression_t ev{};
+        ev.header        = {sizeof(ev), time, CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_NOTE_EXPRESSION, 0};
+        ev.expression_id = id;
+        ev.note_id = noteId; ev.port_index = 0; ev.channel = channel; ev.key = key;
+        ev.value = value;
+        add(ev.header);
+    }
     void param(uint32_t time, clap_id id, double value) {
         clap_event_param_value_t ev{};
         ev.header   = {sizeof(ev), time, CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_PARAM_VALUE, 0};
@@ -102,16 +121,28 @@ struct Input {
 };
 
 struct Output {
-    struct Event { uint32_t time; uint16_t type; uint32_t words[4]; uint8_t bytes[3]; };
+    struct Event {
+        uint32_t time; uint16_t type; uint32_t words[4]; uint8_t bytes[3];
+        // CLAP note events and expressions; value is the velocity or the expression value
+        int32_t noteId; int16_t channel, key; int32_t expressionId; double value;
+    };
     std::vector<Event> events;
 
     static bool tryPush(const clap_output_events_t* list, const clap_event_header_t* h) {
         auto* self = static_cast<Output*>(list->ctx);
-        Event e{h->time, h->type, {}, {}};
+        Event e{h->time, h->type, {}, {}, -1, -1, -1, -1, 0};
         if (h->type == CLAP_EVENT_MIDI2)
             std::memcpy(e.words, reinterpret_cast<const clap_event_midi2_t*>(h)->data, sizeof(e.words));
         else if (h->type == CLAP_EVENT_MIDI)
             std::memcpy(e.bytes, reinterpret_cast<const clap_event_midi_t*>(h)->data, 3);
+        else if (h->type == CLAP_EVENT_NOTE_EXPRESSION) {
+            const auto* x = reinterpret_cast<const clap_event_note_expression_t*>(h);
+            e.noteId = x->note_id; e.channel = x->channel; e.key = x->key;
+            e.expressionId = x->expression_id; e.value = x->value;
+        } else if (h->type <= CLAP_EVENT_NOTE_END) {
+            const auto* n = reinterpret_cast<const clap_event_note_t*>(h);
+            e.noteId = n->note_id; e.channel = n->channel; e.key = n->key; e.value = n->velocity;
+        }
         self->events.push_back(e);
         return true;
     }
@@ -123,6 +154,17 @@ bool isMidi1(const Output::Event& e, uint32_t time, uint8_t s, uint8_t d1, uint8
 }
 bool isMidi2(const Output::Event& e, uint32_t time, uint32_t w0, uint32_t w1) {
     return e.type == CLAP_EVENT_MIDI2 && e.time == time && e.words[0] == w0 && e.words[1] == w1;
+}
+bool isNote(const Output::Event& e, uint16_t type, uint32_t time, int32_t noteId, int16_t channel,
+            int16_t key) {
+    return e.type == type && e.time == time && e.noteId == noteId && e.channel == channel &&
+           e.key == key;
+}
+bool isExpression(const Output::Event& e, uint32_t time, int32_t expressionId, int32_t noteId,
+                  int16_t channel, int16_t key, double value) {
+    return e.type == CLAP_EVENT_NOTE_EXPRESSION && e.time == time && e.expressionId == expressionId &&
+           e.noteId == noteId && e.channel == channel && e.key == key &&
+           std::fabs(e.value - value) < 1e-9;
 }
 
 // --- the plugin under test -------------------------------------------------------------------
@@ -207,7 +249,8 @@ void testNotePorts() {
         CHECK(r.notePorts->count(r.plugin, input) == 1);
         clap_note_port_info_t info{};
         CHECK(r.notePorts->get(r.plugin, 0, input, &info));
-        CHECK(info.supported_dialects == (CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2));
+        CHECK(info.supported_dialects ==
+              (CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2));
         CHECK(info.preferred_dialect == CLAP_NOTE_DIALECT_MIDI2);
     }
     const auto* audio = static_cast<const clap_plugin_audio_ports_t*>(
@@ -329,6 +372,66 @@ void testOutOfRangeAndReset() {
     CHECK(out.size() == 1 && isMidi1(out[0], 0, 0x80, 65, 0));
 }
 
+void testClapNotes() {
+    Instance r;
+    if (!r.ok()) return;
+    Input in;
+    in.param(0, 0, 36);                   // 36-EDO, +1 octave +2 steps: 12.667 semitones,
+    in.param(0, 1, 1);                    // key +13 and tuning -171/512
+    in.param(0, 2, 2);
+    in.note(CLAP_EVENT_NOTE_ON, 10, 7, 0, 60);
+    in.expression(20, CLAP_NOTE_EXPRESSION_TUNING, 7, 0, 60, 0.25);    // the host's own tuning
+    in.expression(30, CLAP_NOTE_EXPRESSION_VOLUME, 7, 0, 60, 0.5);
+    in.expression(40, CLAP_NOTE_EXPRESSION_PAN, 7, -1, -1, 0.3);       // by note_id only
+    in.note(CLAP_EVENT_NOTE_OFF, 50, 7, 0, 60);
+    in.note(CLAP_EVENT_NOTE_OFF, 60, 8, 0, 62);                        // never started: current shift
+    const auto out = r.process(in);
+    const double f = -171.0 / 512.0;
+    CHECK(out.size() == 7);
+    if (out.size() == 7) {
+        CHECK(isNote(out[0], CLAP_EVENT_NOTE_ON, 10, 7, 0, 73) && out[0].value == 0.8);
+        CHECK(isExpression(out[1], 10, CLAP_NOTE_EXPRESSION_TUNING, 7, 0, 73, f));
+        CHECK(isExpression(out[2], 20, CLAP_NOTE_EXPRESSION_TUNING, 7, 0, 73, 0.25 + f));
+        CHECK(isExpression(out[3], 30, CLAP_NOTE_EXPRESSION_VOLUME, 7, 0, 73, 0.5));
+        CHECK(isExpression(out[4], 40, CLAP_NOTE_EXPRESSION_PAN, 7, 0, 73, 0.3));
+        CHECK(isNote(out[5], CLAP_EVENT_NOTE_OFF, 50, 7, 0, 73));
+        CHECK(isNote(out[6], CLAP_EVENT_NOTE_OFF, 60, 8, 0, 75));
+    }
+}
+
+void testClapNotesLatch() {
+    Instance r;
+    if (!r.ok()) return;
+    Input a;
+    a.param(0, 1, 1);                     // +1 octave, 12-EDO: no fraction, no tuning event
+    a.note(CLAP_EVENT_NOTE_ON, 0, 1, 2, 60);
+    const auto outA = r.process(a);
+    CHECK(outA.size() == 1 && isNote(outA[0], CLAP_EVENT_NOTE_ON, 0, 1, 2, 72));
+
+    Input b;
+    b.param(0, 1, -1);                    // changed while note 1 is held
+    b.note(CLAP_EVENT_NOTE_ON, 10, 2, 2, 60);      // retrigger: note 1 ends on 72 first
+    b.note(CLAP_EVENT_NOTE_CHOKE, 20, 2, -1, -1);  // by note_id only
+    b.note(CLAP_EVENT_NOTE_OFF, 30, 1, 2, 60);     // note 1 already ended: current shift
+    const auto outB = r.process(b);
+    CHECK(outB.size() == 4);
+    if (outB.size() == 4) {
+        CHECK(isNote(outB[0], CLAP_EVENT_NOTE_OFF, 10, 1, 2, 72));
+        CHECK(isNote(outB[1], CLAP_EVENT_NOTE_ON, 10, 2, 2, 48));
+        CHECK(isNote(outB[2], CLAP_EVENT_NOTE_CHOKE, 20, 2, 2, 48));
+        CHECK(isNote(outB[3], CLAP_EVENT_NOTE_OFF, 30, 1, 2, 48));
+    }
+
+    Input c;
+    c.param(0, 1, 4);                     // +48
+    c.note(CLAP_EVENT_NOTE_ON, 0, 3, 0, 100);      // 148: dropped, with what follows it
+    c.expression(1, CLAP_NOTE_EXPRESSION_TUNING, 3, 0, 100, 0.1);
+    c.note(CLAP_EVENT_NOTE_OFF, 2, 3, 0, 100);
+    c.note(CLAP_EVENT_NOTE_OFF, 3, -1, -1, -1);    // wildcard: passes through
+    const auto outC = r.process(c);
+    CHECK(outC.size() == 1 && isNote(outC[0], CLAP_EVENT_NOTE_OFF, 3, -1, -1, -1));
+}
+
 struct Sink {
     std::string bytes;
     static int64_t write(const clap_ostream_t* s, const void* buffer, uint64_t size) {
@@ -402,6 +505,8 @@ int main(int argc, char** argv) {
     testMidi2();
     testHeldNoteAcrossBlocks();
     testOutOfRangeAndReset();
+    testClapNotes();
+    testClapNotesLatch();
     testState();
     gEntry->deinit();
     if (failures != 0) {

@@ -2,7 +2,7 @@
 
 ## Tests
 - all: cmake -S . -B build -G Ninja && ninja -C build && ctest --test-dir build --output-on-failure
-- validator: clap-validator validate build/Retune.clap (34 pass, 10 skipped: no presets, audio ports or CLAP dialect)
+- validator: clap-validator validate build/Retune.clap (35 pass, 9 skipped: no presets or audio ports)
 - install: ninja -C build install-clap (symlinks Retune.clap into the user CLAP folder)
 
 ## M0: Plan
@@ -33,11 +33,11 @@
 - [ ] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below)
 
 ## M3: CLAP note dialect (keeps the fraction in Bitwig)
-- [ ] Note ports also advertise `CLAP` (preference stays MIDI2)
-- [ ] CLAP Note On: whole key + `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right after) with the fraction
-- [ ] Latch by note_id too; Note Off / choke / other expressions follow the latched key
-- [ ] A host's own tuning expression on a shifted note gets the fraction added
-- [ ] Headless host test for CLAP note events; clap-validator's CLAP note tests run
+- [x] Note ports also advertise `CLAP` (preference stays MIDI2)
+- [x] CLAP Note On: nearest whole key (as MIDI 1.0) + `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right after) with the signed fraction
+- [x] Latch by note_id too; Note Off / choke / other expressions follow the latched key
+- [x] A host's own tuning expression on a shifted note gets the fraction added
+- [x] Headless host test for CLAP note events; clap-validator's CLAP note tests run
 - [ ] Heard in Bitwig with a synth that honours tuning expressions, at 36-EDO
 
 ## M4: Other formats (clap-wrapper)

@@ -2,10 +2,10 @@
 // and one note output port and three parameters (Divisions, Octaves, Steps). Hand-written CLAP
 // entry point, as in PlainOldSynth and StruckSynth, so the ports can speak MIDI 2.0.
 //
-// The ports advertise MIDI | MIDI2 and prefer MIDI2 (PLAN.md: MIDI 2.0 is the base case; the
-// CLAP note dialect is TBD). Output follows input: a CLAP_EVENT_MIDI2 leaves as CLAP_EVENT_MIDI2,
-// a CLAP_EVENT_MIDI as CLAP_EVENT_MIDI. CLAP note events, which a host shouldn't send to these
-// ports, pass through untransposed rather than being lost.
+// The ports advertise CLAP | MIDI | MIDI2 and prefer MIDI2 (PLAN.md: MIDI 2.0 is the base case).
+// Output follows input: a CLAP_EVENT_MIDI2 leaves as CLAP_EVENT_MIDI2, a CLAP_EVENT_MIDI as
+// CLAP_EVENT_MIDI, and CLAP note events as CLAP note events, with the fraction as a tuning
+// expression (ClapNotes; Bitwig sends plugins no MIDI 2.0).
 //
 // Building with RETUNE_DIALECT_LOG on adds a log of what the host sends (its supported note
 // dialects and a count of every incoming note event by kind), to learn what Bitwig, REAPER and
@@ -22,6 +22,7 @@
 #include <cstring>
 #include <string>
 
+#include "ClapNotes.h"
 #include "RetuneCore.h"
 #include "uw/ump/Ump.h"
 
@@ -105,7 +106,8 @@ struct Plugin {
     std::atomic<double> values[kParamCount];
     std::atomic<bool>   valuesChangedByState{false};   // state_load → process: re-apply
 
-    retune::RetuneCore core;   // audio thread while active; main thread otherwise
+    retune::RetuneCore core;        // MIDI 1.0 and 2.0; audio thread while active, main thread otherwise
+    retune::ClapNotes  clapNotes;   // CLAP note events; likewise
     std::string        scratch;
 
 #ifdef RETUNE_DIALECT_LOG
@@ -123,10 +125,16 @@ retune::Params currentParams(const Plugin* p) {
             int(p->values[2].load(std::memory_order_relaxed))};
 }
 
+void applyParams(Plugin* p) {
+    const retune::Params params = currentParams(p);
+    p->core.setParams(params);
+    p->clapNotes.setParams(params);
+}
+
 void applyParamEvent(Plugin* p, const clap_event_param_value_t* ev) {
     if (ev->param_id >= kParamCount) return;
     p->values[ev->param_id].store(clampParam(ev->param_id, ev->value), std::memory_order_relaxed);
-    p->core.setParams(currentParams(p));
+    applyParams(p);
 }
 
 #ifdef RETUNE_DIALECT_LOG
@@ -246,12 +254,15 @@ void handleEvent(Plugin* p, const clap_event_header_t* h, const clap_output_even
             break;
         }
 
-        case CLAP_EVENT_MIDI_SYSEX:
         case CLAP_EVENT_NOTE_ON:
         case CLAP_EVENT_NOTE_OFF:
         case CLAP_EVENT_NOTE_CHOKE:
         case CLAP_EVENT_NOTE_EXPRESSION:
-            push(out, h);   // SysEx passes through; CLAP note events: TBD (see the top)
+            p->clapNotes.process(h, out);
+            break;
+
+        case CLAP_EVENT_MIDI_SYSEX:
+            push(out, h);   // SysEx passes through
             break;
 
         default:
@@ -289,7 +300,8 @@ void plug_destroy(const clap_plugin_t* plugin) {
 bool plug_activate(const clap_plugin_t* plugin, double, uint32_t, uint32_t) {
     Plugin* p = self(plugin);
     p->core.reset();
-    p->core.setParams(currentParams(p));
+    p->clapNotes.reset();
+    applyParams(p);
     p->valuesChangedByState.store(false, std::memory_order_relaxed);
     return true;
 }
@@ -305,12 +317,15 @@ void plug_deactivate(const clap_plugin_t* plugin) {
 bool plug_start_processing(const clap_plugin_t*) { return true; }
 void plug_stop_processing(const clap_plugin_t*) {}
 
-void plug_reset(const clap_plugin_t* plugin) { self(plugin)->core.reset(); }
+void plug_reset(const clap_plugin_t* plugin) {
+    self(plugin)->core.reset();
+    self(plugin)->clapNotes.reset();
+}
 
 clap_process_status plug_process(const clap_plugin_t* plugin, const clap_process_t* process) {
     Plugin* p = self(plugin);
     if (p->valuesChangedByState.exchange(false, std::memory_order_acquire))
-        p->core.setParams(currentParams(p));
+        applyParams(p);
 
     const clap_input_events_t* in = process->in_events;
     const uint32_t count = in != nullptr ? in->size(in) : 0;
@@ -339,7 +354,7 @@ bool note_ports_get(const clap_plugin_t*, uint32_t index, bool isInput, clap_not
     if (index != 0) return false;
     std::memset(info, 0, sizeof(*info));
     info->id                 = isInput ? 0 : 1;
-    info->supported_dialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2;
+    info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2;
     info->preferred_dialect  = CLAP_NOTE_DIALECT_MIDI2;
     std::snprintf(info->name, sizeof(info->name), "%s", isInput ? "Notes in" : "Notes out");
     return true;
@@ -502,7 +517,7 @@ const clap_plugin_t* factory_create(const clap_plugin_factory_t*, const clap_hos
 #ifdef RETUNE_DIALECT_LOG
     for (auto& c : p->counts) c.store(0, std::memory_order_relaxed);
 #endif
-    p->core.setParams(currentParams(p));
+    applyParams(p);
     p->clap = clap_plugin_t{
         .desc             = &kDescriptor,
         .plugin_data      = p,

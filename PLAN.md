@@ -15,7 +15,7 @@ log in Bitwig and REAPER, and listen through StageHand once it can host note eff
 | Kind of shift | Fixed transpose by an interval of an equal division of the octave (EDO): octaves + steps of 1/N octave. Every note moves by the same interval; the keyboard stays 12-TET (no key → N-EDO mapping) |
 | MIDI 1.0 output, fractional pitch | Round to the nearest semitone |
 | MIDI 2.0 output, fractional pitch | Note On attribute type 3, **Pitch 7.9** |
-| Base case | **MIDI 2.0.** MIDI 1.0 is supported (rounded). The CLAP note dialect is **TBD** (see below) |
+| Base case | **MIDI 2.0.** MIDI 1.0 is supported (rounded). The CLAP note dialect is supported too: nearest key + a tuning expression (M3) |
 | Form | Plugin. CLAP first, then the other formats clap-wrapper supports for MIDI→MIDI |
 
 ## What clap-wrapper does with a note effect (checked in PlainOldSynth's copy, v0.16.0)
@@ -46,8 +46,9 @@ would take wrapper patches (see the last phase).
 - **Shift** in semitones = `12 × Octaves + 12 × Steps / N` (in cents: `1200 × Octaves + 1200 × Steps / N`).
   With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
 - **Output format follows the input format.** An event that arrives as MIDI 1.0 leaves as MIDI 1.0.
-  An event that arrives as MIDI 2.0 leaves as MIDI 2.0. (CLAP note events: TBD. Until then, any a
-  host sends anyway pass through untransposed, so notes aren't lost.)
+  An event that arrives as MIDI 2.0 leaves as MIDI 2.0. CLAP note events leave as CLAP note events
+  (`src/ClapNotes.h`): the Note On goes to the nearest whole key, as on the MIDI 1.0 path, and a
+  `CLAP_NOTE_EXPRESSION_TUNING` right after it carries the signed fraction.
 - **MIDI 1.0 path**: `outKey = inKey + round(shift)`.
 - **MIDI 2.0 path**: take the Note On's pitch as 7.9 (from its attribute if it has type 3, otherwise
   `key << 9`), add `round(shift × 512)`, and write it back as attribute type 3. `outKey` is the
@@ -160,7 +161,7 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 ## Open questions
 
-- **CLAP note dialect: to add (decided 2026-10-21, MILESTONES.md M3).** MIDI 2.0 stays the base
+- **CLAP note dialect: added (decided 2026-10-21, done in M3, `src/ClapNotes.h`).** MIDI 2.0 stays the base
   case, but Bitwig sends plugins no MIDI 2.0. How: send the fraction as a `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right
   after the Note On), add it to any tuning expression the host already sends for that note, and
   remap the key/note_id of other note expressions from the latch table.
