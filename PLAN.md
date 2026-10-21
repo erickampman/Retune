@@ -160,8 +160,8 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 ## Open questions
 
-- **CLAP note dialect: TBD.** MIDI 2.0 is the base case, so CLAP note events are left out for now.
-  If they are added later: send the fraction as a `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right
+- **CLAP note dialect: to add (decided 2026-10-21, MILESTONES.md M3).** MIDI 2.0 stays the base
+  case, but Bitwig sends plugins no MIDI 2.0. How: send the fraction as a `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right
   after the Note On), add it to any tuning expression the host already sends for that note, and
   remap the key/note_id of other note expressions from the latch table.
   **Dialect log, Bitwig Studio 6.1.3 (2026-10-21):** the host's note dialects are `CLAP | MIDI |

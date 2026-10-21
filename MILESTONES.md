@@ -10,7 +10,7 @@
 - [x] Parameters: Divisions (1–96), Octaves (±4), Steps (clamped to ±N)
 - [x] Private repo erickampman/Retune
 - [x] UMP code from uw-core's uw::ump, not Retune's own
-- [ ] CLAP note dialect: decide after the dialect log (M2) shows what Bitwig sends
+- [x] CLAP note dialect: add it (M3), since Bitwig sends plugins no MIDI 2.0 (2026-10-21)
 
 ## M1: Core library
 - [x] uw-core: `notePitch79`, `transposeNote79`, `transposePitch725` in uw::ump, with tests (uw-core 89dd48e, pinned)
@@ -32,11 +32,19 @@
 - [ ] Dialect log in REAPER
 - [ ] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below)
 
-## M3: Other formats (clap-wrapper)
+## M3: CLAP note dialect (keeps the fraction in Bitwig)
+- [ ] Note ports also advertise `CLAP` (preference stays MIDI2)
+- [ ] CLAP Note On: whole key + `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right after) with the fraction
+- [ ] Latch by note_id too; Note Off / choke / other expressions follow the latched key
+- [ ] A host's own tuning expression on a shifted note gets the fraction added
+- [ ] Headless host test for CLAP note events; clap-validator's CLAP note tests run
+- [ ] Heard in Bitwig with a synth that honours tuning expressions, at 36-EDO
+
+## M4: Other formats (clap-wrapper)
 - [ ] AUv2 / AUv3 (`aumi`), VST3: MIDI 1.0 (rounded) behaviour
 - [ ] Checked in Logic (MIDI FX slot), REAPER and Bitwig
 
-## M4: Later
+## M5: Later
 - [ ] Wrapper patches to keep the fraction (AU MIDI 2.0 event lists, VST3 `noteOn.tuning`)
 - [ ] GUI: Divisions, Octaves, Steps, resulting cents (ask first: UI-visible)
 
