@@ -4,3 +4,9 @@
 [submodule "external/uw-core"]
 	path = external/uw-core
 	url = https://github.com/erickampman/uw-core.git
+[submodule "external/clap-wrapper"]
+	path = external/clap-wrapper
+	url = https://github.com/free-audio/clap-wrapper.git
+[submodule "external/vst3sdk"]
+	path = external/vst3sdk
+	url = https://github.com/steinbergmedia/vst3sdk.git

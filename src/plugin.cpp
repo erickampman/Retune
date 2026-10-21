@@ -7,6 +7,11 @@
 // CLAP_EVENT_MIDI, and CLAP note events as CLAP note events, with the fraction as a tuning
 // expression (ClapNotes; Bitwig sends plugins no MIDI 2.0).
 //
+// Inside clap-wrapper (AUv2, VST3) the ports prefer MIDI 1.0 instead: the wrappers can't carry
+// the fraction, and the AUv2 wrapper turns MIDI 2.0 output into MIDI 1.0 with the key alone, which
+// would round down rather than to nearest. Both ports have id 0, since the AUv2 wrapper sends an
+// output event to the port whose id equals the event's port_index.
+//
 // Building with RETUNE_DIALECT_LOG on adds a log of what the host sends (its supported note
 // dialects and a count of every incoming note event by kind), to learn what Bitwig, REAPER and
 // others actually deliver to a note effect. The audio thread only counts; the main thread
@@ -109,6 +114,7 @@ struct Plugin {
     retune::RetuneCore core;        // MIDI 1.0 and 2.0; audio thread while active, main thread otherwise
     retune::ClapNotes  clapNotes;   // CLAP note events; likewise
     std::string        scratch;
+    bool               wrapped = false;   // hosted by clap-wrapper (AUv2, VST3)
 
 #ifdef RETUNE_DIALECT_LOG
     std::atomic<uint64_t> counts[kKindCount];
@@ -350,12 +356,12 @@ const clap_plugin_audio_ports_t kAudioPorts = {audio_ports_count, audio_ports_ge
 
 uint32_t note_ports_count(const clap_plugin_t*, bool) { return 1; }
 
-bool note_ports_get(const clap_plugin_t*, uint32_t index, bool isInput, clap_note_port_info_t* info) {
+bool note_ports_get(const clap_plugin_t* plugin, uint32_t index, bool isInput, clap_note_port_info_t* info) {
     if (index != 0) return false;
     std::memset(info, 0, sizeof(*info));
-    info->id                 = isInput ? 0 : 1;
+    info->id                 = 0;   // ids may overlap between inputs and outputs
     info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2;
-    info->preferred_dialect  = CLAP_NOTE_DIALECT_MIDI2;
+    info->preferred_dialect  = self(plugin)->wrapped ? CLAP_NOTE_DIALECT_MIDI : CLAP_NOTE_DIALECT_MIDI2;
     std::snprintf(info->name, sizeof(info->name), "%s", isInput ? "Notes in" : "Notes out");
     return true;
 }
@@ -512,6 +518,9 @@ const clap_plugin_t* factory_create(const clap_plugin_factory_t*, const clap_hos
     auto* p = new (std::nothrow) Plugin();
     if (p == nullptr) return nullptr;
     p->host = host;
+    // clap-wrapper's host names the plugin's real host but keeps its own url (clap_proxy.cpp).
+    p->wrapped = host->url != nullptr &&
+                 std::strcmp(host->url, "https://github.com/free-audio/clap-wrapper") == 0;
     for (uint32_t i = 0; i < kParamCount; ++i)
         p->values[i].store(kParams[i].def, std::memory_order_relaxed);
 #ifdef RETUNE_DIALECT_LOG

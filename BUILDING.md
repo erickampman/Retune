@@ -1,8 +1,10 @@
 # Building Retune
 
-Retune builds the same way on Linux and macOS: CMake + Ninja, two git submodules, C++20.
+Retune builds the same way on Linux and macOS: CMake + Ninja, git submodules, C++20.
 The build makes the core library `retune_core`, the plugin `Retune.clap`, and two test programs:
 `retune-core-tests` (the core) and `retune-clap-tests` (a headless host that loads the built `.clap`).
+It also wraps the same plugin with clap-wrapper: `Retune.vst3` (Linux and macOS) and
+`Retune.component`, an AUv2 MIDI effect (macOS only).
 
 ## What you need
 
@@ -23,11 +25,13 @@ No JACK, ALSA, CoreAudio or CoreMIDI is needed: Retune builds uw-core with
 git clone https://github.com/erickampman/Retune.git
 cd Retune
 git submodule update --init
+git -C external/vst3sdk submodule update --init
 ```
 
-If you already cloned without the submodules, `external/clap` and `external/uw-core` are empty
-directories and CMake fails at `add_subdirectory`. Run `git submodule update --init` to fix it.
-`--recursive` isn't needed: uw-core's own submodules are only used outside the UMP-only build.
+If you already cloned without the submodules, the folders under `external/` are empty and CMake
+fails at `add_subdirectory`. Run the two commands above to fix it. The VST3 SDK needs its own
+submodules (`base`, `pluginterfaces`, `public.sdk` …). uw-core's don't matter: they are only used
+outside the UMP-only build, so `--recursive` isn't needed.
 
 ## Build and test
 
@@ -44,20 +48,40 @@ Linux, a bundle directory on macOS.
 
 Release build: add `-DCMAKE_BUILD_TYPE=Release` to the first command.
 
+### VST3 and AUv2 (clap-wrapper)
+
+| Option | Default | Makes |
+|---|---|---|
+| `RETUNE_BUILD_VST3` | ON | `build/Retune.vst3` |
+| `RETUNE_BUILD_AUV2` | ON on macOS, OFF elsewhere | `build/Retune.component` (type `aumi`, subtype `Rtun`, manufacturer `nLKL`) |
+
+On its first configure, the AUv2 build downloads Apple's AudioUnitSDK (clap-wrapper does this with
+CPM), so it needs the network once. `-DAUDIOUNIT_SDK_ROOT=<path>` uses a local copy instead. Turn
+an option off (`-DRETUNE_BUILD_VST3=OFF`) to skip that format.
+
+The wrapped formats keep only the MIDI 1.0 (rounded) behaviour. Inside clap-wrapper, Retune prefers
+the MIDI 1.0 dialect (PLAN.md, "What clap-wrapper does with a note effect").
+
 ### Installing the plugin for hosts
 
 ```bash
 ninja -C build install-clap
+ninja -C build install-vst3
+ninja -C build install-auv2     # macOS
 ```
 
-This symlinks the built plugin into the user CLAP folder, so a rebuild is picked up without
-reinstalling:
+`install-clap` and `install-vst3` symlink the built plugin into the user plugin folder, so a rebuild
+is picked up without reinstalling. `install-auv2` copies the bundle, so run it again after a
+rebuild.
 
-| Linux | macOS |
-|---|---|
-| `~/.clap/Retune.clap` | `~/Library/Audio/Plug-Ins/CLAP/Retune.clap` |
+| | Linux | macOS |
+|---|---|---|
+| CLAP | `~/.clap/Retune.clap` | `~/Library/Audio/Plug-Ins/CLAP/Retune.clap` |
+| VST3 | `~/.vst3/Retune.vst3` | `~/Library/Audio/Plug-Ins/VST3/Retune.vst3` |
+| AUv2 | — | `~/Library/Audio/Plug-Ins/Components/Retune.component` |
 
-An ordinary build never writes outside `build/`; only this target does.
+An ordinary build never writes outside `build/`; only these targets do. Check the AU with
+`auval -v aumi Rtun nLKL`.
 
 ### Dialect log
 
@@ -85,4 +109,13 @@ When the change is ready, push uw-core first, then move Retune's submodule pin
 
 ## Checked so far
 
-- **Linux:** GCC 15.2, Ninja: core and plugin build, both tests pass (2026-10-21).
+- **Linux:** GCC 15.2, Ninja: core and plugin build, both tests pass (2026-10-21). The VST3 build
+  (M4) isn't checked on Linux yet.
+- **macOS:** Xcode 26.3 (Apple Clang), Ninja (2026-10-21):
+  - the CLAP, VST3 and AUv2 builds have no warnings, and both tests pass;
+  - clap-validator: 35 pass, 0 fail;
+  - auval: passes;
+  - Steinberg's VST3 validator: 47 pass, 0 fail.
+
+  The VST3 SDK's own CMake rejects an Xcode path with spaces. That only matters when you build its
+  `validator` yourself: point `DEVELOPER_DIR` at a symlink without spaces.

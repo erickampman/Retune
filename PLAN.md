@@ -116,7 +116,10 @@ latch table) stays here.
    checks the output events. A debug build logs the host's `supported_dialects()` and the type of every
    incoming note event, to find out what Bitwig, REAPER etc. actually send. Then listen through StageHand → Retune → StruckSynth
    (which already plays 7.9 pitch).
-3. **AUv2 / AUv3 / VST3 via clap-wrapper**, MIDI 1.0 (rounded) behaviour only. Check them in Logic
+3. **AUv2 / AUv3 / VST3 via clap-wrapper**, MIDI 1.0 (rounded) behaviour only. Done for AUv2 and
+   VST3 (M4). Under clap-wrapper the ports prefer MIDI 1.0. Otherwise the AUv2 wrapper would ask an
+   AU host for MIDI 2.0, and its MIDI 2.0 → 1.0 output conversion keeps only the key, which rounds
+   down. The VST3 wrapper always sends CLAP note events, so ClapNotes gives the rounded key there. Check them in Logic
    (AU MIDI FX slot), REAPER and Bitwig. VST3 loading as an "instrument" is a known limitation.
 4. **(Optional) wrapper patches to keep the fraction**:
    - AUv2/AUv3: emit a `kMIDIProtocol_2_0` event list and pass `CLAP_EVENT_MIDI2` through raw when

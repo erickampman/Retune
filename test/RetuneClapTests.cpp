@@ -63,6 +63,20 @@ const clap_host_t kHost = {
     .request_callback = hostNoop,
 };
 
+// The same host as clap-wrapper reports itself (clap_proxy.cpp): the real host's name, its url.
+const clap_host_t kWrapperHost = {
+    .clap_version     = CLAP_VERSION_INIT,
+    .host_data        = nullptr,
+    .name             = "Logic Pro",
+    .vendor           = "The CLAP Wrapper Team",
+    .url              = "https://github.com/free-audio/clap-wrapper",
+    .version          = "0.16.0",
+    .get_extension    = hostGetExtension,
+    .request_restart  = hostNoop,
+    .request_process  = hostNoop,
+    .request_callback = hostNoop,
+};
+
 // --- events ----------------------------------------------------------------------------------
 
 // Owns copies of the input events, in order.
@@ -178,8 +192,8 @@ struct Instance {
     const clap_plugin_state_t* state = nullptr;
     const clap_plugin_note_ports_t* notePorts = nullptr;
 
-    Instance() {
-        plugin = gFactory->create_plugin(gFactory, &kHost, "com.unlikelyware.retune");
+    explicit Instance(const clap_host_t* host = &kHost) {
+        plugin = gFactory->create_plugin(gFactory, host, "com.unlikelyware.retune");
         if (plugin == nullptr || !plugin->init(plugin)) return;
         params    = static_cast<const clap_plugin_params_t*>(plugin->get_extension(plugin, CLAP_EXT_PARAMS));
         state     = static_cast<const clap_plugin_state_t*>(plugin->get_extension(plugin, CLAP_EXT_STATE));
@@ -252,10 +266,23 @@ void testNotePorts() {
         CHECK(info.supported_dialects ==
               (CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2));
         CHECK(info.preferred_dialect == CLAP_NOTE_DIALECT_MIDI2);
+        CHECK(info.id == 0);   // the AUv2 wrapper matches output port_index against the id
     }
     const auto* audio = static_cast<const clap_plugin_audio_ports_t*>(
         r.plugin->get_extension(r.plugin, CLAP_EXT_AUDIO_PORTS));
     CHECK(audio != nullptr && audio->count(r.plugin, true) == 0 && audio->count(r.plugin, false) == 0);
+}
+
+void testWrappedPrefersMidi1() {
+    Instance r(&kWrapperHost);
+    CHECK(r.ok());
+    if (!r.ok()) return;
+    for (bool input : {true, false}) {
+        clap_note_port_info_t info{};
+        CHECK(r.notePorts->get(r.plugin, 0, input, &info));
+        CHECK(info.preferred_dialect == CLAP_NOTE_DIALECT_MIDI);
+        CHECK((info.supported_dialects & CLAP_NOTE_DIALECT_CLAP) != 0);   // VST3 sends CLAP notes
+    }
 }
 
 void testParams() {
@@ -500,6 +527,7 @@ int main(int argc, char** argv) {
     }
     testDescriptor();
     testNotePorts();
+    testWrappedPrefersMidi1();
     testParams();
     testMidi1();
     testMidi2();

@@ -3,7 +3,9 @@
 ## Tests
 - all: cmake -S . -B build -G Ninja && ninja -C build && ctest --test-dir build --output-on-failure
 - validator: clap-validator validate build/Retune.clap (35 pass, 9 skipped: no presets or audio ports)
-- install: ninja -C build install-clap (symlinks Retune.clap into the user CLAP folder)
+- install: ninja -C build install-clap install-vst3 install-auv2 (CLAP and VST3 symlinked, the AU copied)
+- au: auval -v aumi Rtun nLKL
+- vst3: Steinberg's validator (built from external/vst3sdk) on build/Retune.vst3
 
 ## M0: Plan
 - [x] PLAN.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
@@ -41,7 +43,10 @@
 - [x] Heard in Bitwig with a synth that honours tuning expressions, at 36-EDO (2026-10-21: changing Steps does the right thing)
 
 ## M4: Other formats (clap-wrapper)
-- [ ] AUv2 / AUv3 (`aumi`), VST3: MIDI 1.0 (rounded) behaviour
+- [x] AUv2 (`aumi`, `Rtun`/`nLKL`) and VST3 via clap-wrapper v0.16.0: MIDI 1.0 (rounded) behaviour; auval and Steinberg's validator pass (2026-10-21)
+- [x] Under clap-wrapper the ports prefer MIDI 1.0, and both note ports have id 0 (the AUv2 wrapper routes output by id)
+- [ ] AUv3: needs an app extension inside a containing app; deferred
+- [ ] VST3 built and checked on Linux
 - [ ] Checked in Logic (MIDI FX slot), REAPER and Bitwig
 
 ## M5: Later
