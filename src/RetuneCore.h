@@ -3,7 +3,7 @@
 // RetuneCore: the note-transposing part of Retune, with no CLAP in it. One UMP message in, zero
 // to two out. The UMP itself (fields, classification, Pitch 7.9) comes from uw-core's uw::ump;
 // this file holds only Retune's own rules: the parameters, the shift, and the latch table
-// (PLAN.md, "Behaviour").
+// (docs/design.md, "Behaviour").
 
 #include <cstddef>
 #include <cstdint>
@@ -12,7 +12,7 @@
 
 namespace retune {
 
-// Parameter ranges (PLAN.md, "Parameters").
+// Parameter ranges (docs/design.md, "Parameters").
 inline constexpr int kMinDivisions = 1;
 inline constexpr int kMaxDivisions = 96;
 inline constexpr int kMaxOctaves   = 4;

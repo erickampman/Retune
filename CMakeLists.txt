@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(Retune VERSION 0.1.0 LANGUAGES CXX)
+# macOS: 26 or later, Apple Silicon only. Set before project();
+# ignored on other platforms. Both are cache variables, so -D overrides them.
+set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "macOS 26 or later")
+set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Apple Silicon only")
+project(Retune VERSION 0.9.0 LANGUAGES CXX)
 
 # The core is linked into the .clap, a shared module (M2), so it must be position-independent.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -9,7 +13,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- uw-core (git submodule): only uw::ump, no CLAP host, JACK or ALSA ---------------------
-# RETUNE_UW_CORE_DIR points at another uw-core clone (e.g. ~/Dev-Common/uw-core) to build
+# RETUNE_UW_CORE_DIR points at another uw-core clone (e.g. ../uw-core) to build
 # against a change that isn't pushed and pinned yet.
 set(RETUNE_UW_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/uw-core" CACHE PATH "uw-core source")
 set(UW_CORE_UMP_ONLY ON CACHE BOOL "" FORCE)
@@ -76,7 +80,7 @@ add_custom_target(install-clap
 # --- VST3 / AUv2 via clap-wrapper (M4) --------------------------------------------------------
 # The same plugin, wrapped. Only the MIDI 1.0 (rounded) behaviour survives: the AUv2 wrapper turns
 # MIDI 2.0 output into MIDI 1.0, and the VST3 wrapper passes note on/off only, with tuning 0
-# (PLAN.md, "What clap-wrapper does with a note effect"). clap-wrapper v0.16.0, as in PlainOldSynth.
+# (docs/design.md, "What clap-wrapper does with a note effect"). clap-wrapper v0.16.0, as in PlainOldSynth.
 option(RETUNE_BUILD_VST3 "Build Retune.vst3 via clap-wrapper" ON)
 option(RETUNE_BUILD_AUV2 "Build Retune.component (AUv2 MIDI effect) via clap-wrapper (macOS)" ${APPLE})
 

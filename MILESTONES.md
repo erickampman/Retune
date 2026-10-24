@@ -8,7 +8,7 @@
 - vst3: Steinberg's validator (built from external/vst3sdk) on build/Retune.vst3
 
 ## M0: Plan
-- [x] PLAN.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
+- [x] docs/design.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
 - [x] Parameters: Divisions (1–96), Octaves (±4), Steps (clamped to ±N)
 - [x] Private repo erickampman/Retune
 - [x] UMP code from uw-core's uw::ump, not Retune's own

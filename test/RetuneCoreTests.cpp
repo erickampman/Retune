@@ -1,5 +1,5 @@
 // RetuneCore tests: the shift maths, both protocols, latching, out-of-range drop and
-// pass-through (PLAN.md, phase 1). Silent unless a check fails.
+// pass-through (docs/design.md, phase 1). Silent unless a check fails.
 
 #include <cmath>
 #include <cstdint>

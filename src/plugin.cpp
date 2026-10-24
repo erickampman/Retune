@@ -2,7 +2,7 @@
 // and one note output port and three parameters (Divisions, Octaves, Steps). Hand-written CLAP
 // entry point, as in PlainOldSynth and StruckSynth, so the ports can speak MIDI 2.0.
 //
-// The ports advertise CLAP | MIDI | MIDI2 and prefer MIDI2 (PLAN.md: MIDI 2.0 is the base case).
+// The ports advertise CLAP | MIDI | MIDI2 and prefer MIDI2 (docs/design.md: MIDI 2.0 is the base case).
 // Output follows input: a CLAP_EVENT_MIDI2 leaves as CLAP_EVENT_MIDI2, a CLAP_EVENT_MIDI as
 // CLAP_EVENT_MIDI, and CLAP note events as CLAP note events, with the fraction as a tuning
 // expression (ClapNotes; Bitwig sends plugins no MIDI 2.0).
@@ -52,7 +52,7 @@ struct ParamSpec {
 constexpr ParamSpec kParams[] = {
     {"Divisions", "divisions", retune::kMinDivisions, retune::kMaxDivisions, 12},
     {"Octaves", "octaves", -retune::kMaxOctaves, retune::kMaxOctaves, 0},
-    // The host sees ±(max N); RetuneCore clamps Steps to ±N when it uses it (PLAN.md).
+    // The host sees ±(max N); RetuneCore clamps Steps to ±N when it uses it (docs/design.md).
     {"Steps", "steps", -retune::kMaxDivisions, retune::kMaxDivisions, 0},
 };
 constexpr uint32_t kParamCount = sizeof(kParams) / sizeof(kParams[0]);

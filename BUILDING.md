@@ -66,7 +66,7 @@ CPM), so it needs the network once. `-DAUDIOUNIT_SDK_ROOT=<path>` uses a local c
 an option off (`-DRETUNE_BUILD_VST3=OFF`) to skip that format.
 
 The wrapped formats keep only the MIDI 1.0 (rounded) behaviour. Inside clap-wrapper, Retune prefers
-the MIDI 1.0 dialect (PLAN.md, "What clap-wrapper does with a note effect").
+the MIDI 1.0 dialect (docs/design.md, "What clap-wrapper does with a note effect").
 
 ### Installing the plugin for hosts
 
@@ -94,13 +94,9 @@ An ordinary build never writes outside `build/`; only these targets do. Check th
 `-DRETUNE_DIALECT_LOG=ON` builds a diagnostic plugin that logs the host's note dialects and every
 incoming note event. Leave it off for normal use.
 
-### macOS: universal binaries
+### macOS
 
-To build for both Apple Silicon and Intel:
-
-```bash
-cmake -S . -B build -G Ninja -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-```
+The build targets macOS 26 or later on Apple Silicon only (arm64).
 
 ## Building against a local uw-core
 

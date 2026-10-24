@@ -89,7 +89,7 @@ Retune/
 The core is a plain library over `uw::MidiMessage`, so it can be unit-tested without a host,
 and reused later if a CoreMIDI app or another plugin wants it.
 
-**UMP code comes from uw-core** (`~/Dev-Common/uw-core`, `uw::ump`), as in StageHand, KeyboardEDO
+**UMP code comes from [uw-core](https://github.com/erickampman/uw-core)** (`uw::ump`), as in StageHand, KeyboardEDO
 and StruckKit (UmpireDAW `docs/decisions.md`, "Shared code"). Retune writes no UMP parsing of its
 own: message classification, MIDI 1.0 ↔ 2.0, MIDI 1.0 bytes and the Pitch 7.9 attribute all come
 from `uw::ump`. What is about UMP itself goes into uw-core; what is about Retune (parameters, shift,
@@ -131,7 +131,7 @@ latch table) stays here.
 
 ## StageHand: the main host
 
-StageHand (`~/Dev-MIDI/StageHand`, CLAP hosting in `external/uw-core/src/uw/clap/ClapPlugin.cpp`)
+[StageHand](https://github.com/erickampman/StageHand) (CLAP hosting in `external/uw-core/src/uw/clap/ClapPlugin.cpp`)
 can't use a note effect yet:
 
 - **Plugin output events are dropped.** `ClapPlugin::outEventsTryPush` keeps only param value and
