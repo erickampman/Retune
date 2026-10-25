@@ -62,21 +62,7 @@ The same three commands on both platforms. Everything goes in `build/` (ignored 
 
 The plugin is `build/Retune.clap`: a shared object on Linux, a bundle directory on macOS.
 
-### VST3 and AUv2 (clap-wrapper)
-
-| Option | Default | Makes |
-|---|---|---|
-| `RETUNE_BUILD_VST3` | ON | macOS: `build/Retune.vst3`. Linux: `build/Release/Retune.vst3` (`Debug/` in a Debug build) |
-| `RETUNE_BUILD_AUV2` | ON on macOS, OFF elsewhere | `build/Retune.component` (type `aumi`, subtype `Rtun`, manufacturer `nLKL`) |
-
-On its first configure, the AUv2 build downloads Apple's AudioUnitSDK (clap-wrapper does this with
-CPM), so it needs the network once. `-DAUDIOUNIT_SDK_ROOT=<path>` uses a local copy instead. Turn
-an option off (`-DRETUNE_BUILD_VST3=OFF`) to skip that format.
-
-The wrapped formats keep only the MIDI 1.0 (rounded) behaviour. Inside clap-wrapper, Retune prefers
-the MIDI 1.0 dialect (docs/design.md, "What clap-wrapper does with a note effect").
-
-### Installing the plugin for hosts
+## Installing the plugin for hosts
 
 A plain `cmake --build build` writes nothing outside `build/`. These targets put the plugin where
 hosts look for it:
@@ -121,12 +107,29 @@ For every user instead, the same folders without `~` (`/usr/lib/clap` and `/usr/
 already running keeps the plugin it loaded first: quit and restart it after a rebuild. A plugin you
 built yourself has no quarantine flag, so macOS loads it without the steps a downloaded one needs.
 
-Check the AU with `auval -v aumi Rtun nLKL`.
 
-### Dialect log
+## Options
 
-`-DRETUNE_DIALECT_LOG=ON` builds a diagnostic plugin that logs the host's note dialects and every
-incoming note event. Leave it off for normal use.
+Pass these to the first command (`cmake -B build ... -DNAME=VALUE`).
+
+| Option | Default | Effect |
+|---|---|---|
+| `RETUNE_BUILD_VST3` | `ON` | Build `Retune.vst3` through clap-wrapper (with the vendored `external/vst3sdk`). |
+| `RETUNE_BUILD_AUV2` | `ON` on macOS, `OFF` elsewhere | Build `Retune.component`, an AUv2 MIDI effect (`aumi Rtun nLKL`), through clap-wrapper. **macOS only**. The first configure downloads Apple's AudioUnitSDK; `-DAUDIOUNIT_SDK_ROOT=...` uses a local copy. |
+| `RETUNE_DIALECT_LOG` | `OFF` | A diagnostic plugin that logs the host's note dialects and every incoming note event. Leave it off for normal use. |
+| `RETUNE_UW_CORE_DIR` | `external/uw-core` | Build against another uw-core clone (below). |
+
+The wrapped formats keep only the MIDI 1.0 (rounded) behaviour. Inside clap-wrapper, Retune prefers
+the MIDI 1.0 dialect (docs/design.md, "What clap-wrapper does with a note effect").
+
+## Checking a build
+
+```bash
+clap-validator validate build/Retune.clap   # 35 passed, 0 failed, 0 warnings, 9 skipped
+auval -v aumi Rtun nLKL                     # AU VALIDATION SUCCEEDED (macOS)
+```
+
+[clap-validator](https://github.com/free-audio/clap-validator) is free-audio's CLAP checker.
 
 ## Building against a local uw-core
 
@@ -152,3 +155,15 @@ When the change is ready, push uw-core first, then move Retune's submodule pin
 
   The VST3 SDK's own CMake rejects an Xcode path with spaces. That only matters when you build its
   `validator` yourself: point `DEVELOPER_DIR` at a symlink without spaces.
+
+## How this differs from the other projects
+
+Every Unlikelyware project builds the same way: `git clone`, `tools/fetch_deps.sh`, the three
+commands under "Build and test", and for a plugin `cmake --build build --target install-clap`. The
+same package list, the same `build/` folder, the same option names (`<PROJECT>_BUILD_VST3`,
+`<PROJECT>_UW_CORE_DIR` and so on). What's different here, and why:
+
+- No UI and no DPF: Retune is a note effect with only parameters, so it has no `dpf` submodule and needs no `patches/` (the synths' clap-wrapper patch is for its AUv2 view).
+- The VST3 and AUv2 builds keep only the MIDI 1.0 (rounded) behaviour (above).
+- No `_WERROR` option: the five synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
+- No CI yet (ReleaseUMP R1-3, from November 2026).

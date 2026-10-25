@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.21)   # clap-wrapper needs 3.21
 
 # macOS: 26 or later, Apple Silicon only. Set before project();
 # ignored on other platforms. Both are cache variables, so -D overrides them.
