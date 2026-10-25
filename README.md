@@ -54,6 +54,26 @@ new range. Notes shifted out of MIDI's 0–127 range are dropped. Everything tha
 The Unlikelyware synths ([PlainOldSynth](https://github.com/erickampman/PlainOldSynth),
 [StruckSynth](https://github.com/erickampman/StruckSynth) and the rest) play Pitch 7.9 notes.
 
+## Installing
+
+The download holds `Retune.clap`. Put it in your CLAP folder (create the folder if it isn't there),
+then rescan plugins in your host:
+
+| | Linux | macOS |
+|---|---|---|
+| For you | `~/.clap` | `~/Library/Audio/Plug-Ins/CLAP` |
+| For every user | `/usr/lib/clap` | `/Library/Audio/Plug-Ins/CLAP` |
+
+On macOS, `~/Library` is hidden in Finder: Go ▸ Go to Folder opens it. The 0.9 previews aren't
+notarized, so macOS won't load a downloaded plugin until its quarantine flag is cleared:
+
+```bash
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/Retune.clap
+```
+
+A host that is already running keeps the plugins it loaded: quit and restart it. To build Retune
+yourself instead, see below.
+
 ## Building from source
 
 ```bash
