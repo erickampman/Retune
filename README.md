@@ -59,12 +59,9 @@ The Unlikelyware synths ([PlainOldSynth](https://github.com/erickampman/PlainOld
 ```bash
 git clone https://github.com/erickampman/Retune.git
 cd Retune
-git submodule update --init
-git -C external/vst3sdk submodule update --init base cmake pluginterfaces public.sdk
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C build
-ctest --test-dir build --output-on-failure
-ninja -C build install-clap
+tools/fetch_deps.sh
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 [BUILDING.md](BUILDING.md) has the prerequisites for Linux and macOS, the VST3 and AUv2 options
