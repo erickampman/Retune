@@ -165,5 +165,5 @@ same package list, the same `build/` folder, the same option names (`<PROJECT>_B
 
 - No UI and no DPF: Retune is a note effect with only parameters, so it has no `dpf` submodule and needs no `patches/` (the synths' clap-wrapper patch is for its AUv2 view).
 - The VST3 and AUv2 builds keep only the MIDI 1.0 (rounded) behaviour (above).
-- No `_WERROR` option: the six synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
+- No `_WERROR` option: the seven synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
 - No CI yet (ReleaseUMP R1-3, from November 2026).
