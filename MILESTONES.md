@@ -24,7 +24,7 @@
 - [x] Retrigger ends the old output key; unlatched Note Off / per-note messages follow the current shift
 - [x] A host's Pitch 7.25 on a shifted note moves by the note's full shift, fraction included
 - [x] Table-driven tests: both protocols, with and without an incoming pitch attribute, held-note parameter change, several N values
-- [x] The latch and the CLAP note dialect moved to uw-core (`NoteRemap`, `ClapNoteRemap`, uw-core ab028fb) to share with EDOSpread12; same tests pass (2026-10-29)
+- [x] The latch and the CLAP note dialect moved to uw-core (`NoteRemap`, `ClapNoteRemap`, uw-core a33f7ce) to share with EDOSpread12; same tests pass (2026-10-29)
 
 ## M2: Raw CLAP plugin
 - [x] clap_entry, note-effect feature, note ports in + out (MIDI | MIDI2, prefer MIDI2)
