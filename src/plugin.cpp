@@ -5,7 +5,7 @@
 // The ports advertise CLAP | MIDI | MIDI2 and prefer MIDI2 (docs/design.md: MIDI 2.0 is the base case).
 // Output follows input: a CLAP_EVENT_MIDI2 leaves as CLAP_EVENT_MIDI2, a CLAP_EVENT_MIDI as
 // CLAP_EVENT_MIDI, and CLAP note events as CLAP note events, with the fraction as a tuning
-// expression (ClapNotes; Bitwig sends plugins no MIDI 2.0).
+// expression (uw-core's ClapNoteRemap; Bitwig sends plugins no MIDI 2.0).
 //
 // Inside clap-wrapper (AUv2, VST3) the ports prefer MIDI 1.0 instead: the wrappers can't carry
 // the fraction, and the AUv2 wrapper turns MIDI 2.0 output into MIDI 1.0 with the key alone, which
@@ -27,8 +27,8 @@
 #include <cstring>
 #include <string>
 
-#include "ClapNotes.h"
 #include "RetuneCore.h"
+#include "uw/clap/ClapNoteRemap.h"
 #include "uw/ump/Ump.h"
 
 #ifndef RETUNE_VERSION_STRING
@@ -112,7 +112,7 @@ struct Plugin {
     std::atomic<bool>   valuesChangedByState{false};   // state_load → process: re-apply
 
     retune::RetuneCore core;        // MIDI 1.0 and 2.0; audio thread while active, main thread otherwise
-    retune::ClapNotes  clapNotes;   // CLAP note events; likewise
+    uw::ClapNoteRemap  clapNotes;   // CLAP note events; likewise
     std::string        scratch;
     bool               wrapped = false;   // hosted by clap-wrapper (AUv2, VST3)
 
@@ -134,7 +134,7 @@ retune::Params currentParams(const Plugin* p) {
 void applyParams(Plugin* p) {
     const retune::Params params = currentParams(p);
     p->core.setParams(params);
-    p->clapNotes.setParams(params);
+    p->clapNotes.setShift(retune::shift79(params));
 }
 
 void applyParamEvent(Plugin* p, const clap_event_param_value_t* ev) {

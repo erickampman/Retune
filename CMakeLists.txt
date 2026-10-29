@@ -18,6 +18,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(RETUNE_UW_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/uw-core" CACHE PATH "uw-core source")
 set(UW_CORE_UMP_ONLY ON CACHE BOOL "" FORCE)
 set(UW_CORE_TESTS OFF CACHE BOOL "" FORCE)
+# uw::clap-notes (ClapNoteRemap, the CLAP note dialect) builds against Retune's own CLAP SDK.
+set(UW_CORE_CLAP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/clap/include" CACHE PATH "" FORCE)
 add_subdirectory(${RETUNE_UW_CORE_DIR} uw-core)
 
 # --- core: Retune's rules over uw::ump, no CLAP ----------------------------------------------
@@ -37,14 +39,14 @@ set_target_properties(retune_core PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBI
 
 # The plugin's own sources, compiled into each binary: the .clap and every clap-wrapper format.
 function(retune_add_plugin_sources TARGET_NAME)
-    target_sources(${TARGET_NAME} PRIVATE src/plugin.cpp src/ClapNotes.cpp)
+    target_sources(${TARGET_NAME} PRIVATE src/plugin.cpp)
     target_include_directories(${TARGET_NAME} PRIVATE external/clap/include)
-    target_link_libraries(${TARGET_NAME} PRIVATE retune_core)
+    target_link_libraries(${TARGET_NAME} PRIVATE retune_core uw::clap-notes)
     target_compile_definitions(${TARGET_NAME} PRIVATE RETUNE_VERSION_STRING="${PROJECT_VERSION}"
         $<$<BOOL:${RETUNE_DIALECT_LOG}>:RETUNE_DIALECT_LOG>)
     set_target_properties(${TARGET_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-        set_source_files_properties(src/plugin.cpp src/ClapNotes.cpp TARGET_DIRECTORY ${TARGET_NAME}
+        set_source_files_properties(src/plugin.cpp TARGET_DIRECTORY ${TARGET_NAME}
             PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
     endif()
 endfunction()

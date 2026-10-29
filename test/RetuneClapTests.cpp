@@ -2,7 +2,7 @@
 // clap_entry, factory, then MIDI 1.0 and MIDI 2.0 events in and the output events checked.
 // RetuneCoreTests covers the transpose rules; this covers the CLAP side: the descriptor, note
 // ports and dialects, parameters (events, flush, text), state, sample offsets and reset, and the
-// CLAP note dialect (ClapNotes), which has no UMP form.
+// CLAP note dialect (uw-core's ClapNoteRemap), which has no UMP form.
 //
 // Usage: retune-clap-tests /path/to/Retune.clap. Silent unless a check fails.
 

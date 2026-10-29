@@ -47,7 +47,7 @@ would take wrapper patches (see the last phase).
   With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
 - **Output format follows the input format.** An event that arrives as MIDI 1.0 leaves as MIDI 1.0.
   An event that arrives as MIDI 2.0 leaves as MIDI 2.0. CLAP note events leave as CLAP note events
-  (`src/ClapNotes.h`): the Note On goes to the nearest whole key, as on the MIDI 1.0 path, and a
+  (`uw/clap/ClapNoteRemap.h` in uw-core, once `src/ClapNotes.h`): the Note On goes to the nearest whole key, as on the MIDI 1.0 path, and a
   `CLAP_NOTE_EXPRESSION_TUNING` right after it carries the signed fraction.
 - **MIDI 1.0 path**: `outKey = inKey + round(shift)`.
 - **MIDI 2.0 path**: take the Note On's pitch as 7.9 (from its attribute if it has type 3, otherwise
@@ -119,7 +119,7 @@ latch table) stays here.
 3. **AUv2 / AUv3 / VST3 via clap-wrapper**, MIDI 1.0 (rounded) behaviour only. Done for AUv2 and
    VST3 (M4). Under clap-wrapper the ports prefer MIDI 1.0. Otherwise the AUv2 wrapper would ask an
    AU host for MIDI 2.0, and its MIDI 2.0 → 1.0 output conversion keeps only the key, which rounds
-   down. The VST3 wrapper always sends CLAP note events, so ClapNotes gives the rounded key there. Check them in Logic
+   down. The VST3 wrapper always sends CLAP note events, so ClapNoteRemap gives the rounded key there. Check them in Logic
    (AU MIDI FX slot), REAPER and Bitwig. VST3 loading as an "instrument" is a known limitation.
 4. **(Optional) wrapper patches to keep the fraction**:
    - AUv2/AUv3: emit a `kMIDIProtocol_2_0` event list and pass `CLAP_EVENT_MIDI2` through raw when
@@ -164,7 +164,7 @@ AU/VST3 wrappers (phase 3) move down the list.
 
 ## Open questions
 
-- **CLAP note dialect: added (decided 2026-10-21, done in M3, `src/ClapNotes.h`).** MIDI 2.0 stays the base
+- **CLAP note dialect: added (decided 2026-10-21, done in M3, now uw-core's `ClapNoteRemap`).** MIDI 2.0 stays the base
   case, but Bitwig sends plugins no MIDI 2.0. How: send the fraction as a `CLAP_NOTE_EXPRESSION_TUNING` (same note_id, right
   after the Note On), add it to any tuning expression the host already sends for that note, and
   remap the key/note_id of other note expressions from the latch table.
