@@ -45,7 +45,7 @@ tools/fetch_deps.sh
 `tools/fetch_deps.sh` checks out the git submodules at their pinned commits. Run it again after a
 `git pull` that moves, adds or re-points a submodule: a plain pull leaves them where they were.
 
-Of the VST3 SDK's nested submodules it takes only the four the build uses; `--recursive` would also
+Of the VST® 3 SDK's nested submodules it takes only the four the build uses; `--recursive` would also
 download VSTGUI, the SDK tutorials and its docs. If the folders under `external/` are empty, CMake
 fails at `add_subdirectory`, and clap-wrapper stops with "There is no VST3 SDK at
 …/external/vst3sdk" when the SDK's own submodules are: run `tools/fetch_deps.sh` to fix either.
@@ -167,3 +167,5 @@ same package list, the same `build/` folder, the same option names (`<PROJECT>_B
 - The VST3 and AUv2 builds keep only the MIDI 1.0 (rounded) behaviour (above).
 - No `_WERROR` option: the seven synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
 - No CI yet (ReleaseUMP R1-3, from November 2026).
+
+VST is a registered trademark of Steinberg Media Technologies GmbH.

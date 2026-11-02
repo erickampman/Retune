@@ -10,7 +10,7 @@
 ## M0: Plan
 - [x] docs/design.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
 - [x] Parameters: Divisions (1–96), Octaves (±4), Steps (clamped to ±N)
-- [x] Private repo erickampman/Retune
+- [x] Repo erickampman/Retune, MIT
 - [x] UMP code from uw-core's uw::ump, not Retune's own
 - [x] CLAP note dialect: add it (M3), since Bitwig sends plugins no MIDI 2.0 (2026-10-21)
 
@@ -24,7 +24,7 @@
 - [x] Retrigger ends the old output key; unlatched Note Off / per-note messages follow the current shift
 - [x] A host's Pitch 7.25 on a shifted note moves by the note's full shift, fraction included
 - [x] Table-driven tests: both protocols, with and without an incoming pitch attribute, held-note parameter change, several N values
-- [x] The latch and the CLAP note dialect moved to uw-core (`NoteRemap`, `ClapNoteRemap`, uw-core a33f7ce) to share with EDOSpread12; same tests pass (2026-10-29)
+- [x] The latch and the CLAP note dialect moved to uw-core (`NoteRemap`, `ClapNoteRemap`, uw-core a33f7ce) to share with other note effects; same tests pass (2026-10-29)
 
 ## M2: Raw CLAP plugin
 - [x] clap_entry, note-effect feature, note ports in + out (MIDI | MIDI2, prefer MIDI2)
@@ -52,10 +52,10 @@
 
 ## M5: Later
 - [ ] Wrapper patches to keep the fraction (AU MIDI 2.0 event lists, VST3 `noteOn.tuning`)
-- [ ] GUI: Divisions, Octaves, Steps, resulting cents (ask first: UI-visible)
+- [ ] GUI: Divisions, Octaves, Steps, resulting cents
 
 ## Outside Retune (StageHand)
-- [ ] `outEventsTryPush` keeps plugin note output (MIDI 1.0 and 2.0 as UMP)
-- [ ] Per-row MIDI-effect chain before the instrument
-- [ ] Rack format + UI for a row's MIDI effects (ask first: UI-visible)
-- [ ] Fake note-effect plugin in tests, then Retune → StruckSynth end to end
+- [x] `outEventsTryPush` keeps plugin note output (MIDI 1.0 and 2.0 as UMP)
+- [x] Per-row MIDI-effect chain before the instrument
+- [x] Rack format + UI for a row's MIDI effects (the MIDI FX menu; StageHand's docs/midi-effects.md)
+- [x] Fake note-effect plugin in tests, then Retune → StruckSynth end to end (StageHand's M3)

@@ -27,7 +27,7 @@ A CLAP plugin that declares `CLAP_PLUGIN_FEATURE_NOTE_EFFECT` and has a note *ou
 | **CLAP** (native) | Yes | Yes | **Yes**: we control the port dialects |
 | **AUv2** | Yes, type `aumi` (`build-helper.cpp:172`) | Yes | **No**: `CLAP_EVENT_MIDI2` is down-converted to MIDI 1.0 (`wrapasauv2.cpp`, `send`), so the fraction is lost |
 | **AUv3** | Yes, type `aumi` (`auv3/build-helper.cpp:251`) | Yes | **No**: the output list is `kMIDIProtocol_1_0` and MIDI2 is down-converted (`auv3/process.mm:821`, `~898`) |
-| **VST3** | Partly: mapped to `kInstrumentSynth` (`vst3/categories.cpp:62`), since VST3 has no MIDI-effect category | Note on/off only. `CLAP_EVENT_MIDI` / `MIDI2` output is **dropped** (`vst3/process.cpp:810`) | No. VST3 note events have a `tuning` field (cents), but the wrapper hard-codes it to `0` |
+| **VST® 3** | Partly: mapped to `kInstrumentSynth` (`vst3/categories.cpp:62`), since VST3 has no MIDI-effect category | Note on/off only. `CLAP_EVENT_MIDI` / `MIDI2` output is **dropped** (`vst3/process.cpp:810`) | No. VST3 note events have a `tuning` field (cents), but the wrapper hard-codes it to `0` |
 
 So **every wrapped format can do the MIDI 1.0 (rounded) behaviour** if Retune emits CLAP note
 events or MIDI 1.0. **Only native CLAP carries Pitch 7.9 today.** Keeping the fraction in AU or VST3
@@ -172,3 +172,5 @@ AU/VST3 wrappers (phase 3) move down the list.
   MIDI_MPE`, with no MIDI2. Retune received only MIDI 1.0 Note On/Off (158 each). So in Bitwig the
   MIDI 2.0 path is never used and the fraction is rounded away; only the CLAP dialect (tuning
   expression) could keep it there.
+
+VST is a registered trademark of Steinberg Media Technologies GmbH.
