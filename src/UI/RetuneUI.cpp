@@ -1,11 +1,10 @@
 // RetuneUI.cpp — Retune's editor (docs/design.md, "Editor"), DPF + NanoVG, after NoteGran's.
 //
 // NoteGran's shell, cut down to one plugin: the header (the Unlikelyware logo and "Retune" in its
-// accent), the house widget kit (Knob, GroupBox, Logo), and one fixed layout. On the left the shift
-// on a circle of N steps (Views.hpp's ShiftCircle), its dot dragged or a step clicked setting Steps; on the right the
-// Shift group (Divisions, Octaves, Steps) over what's held (HeldView: each note in, and where it
-// went). The Steps knob turns through ±N, the range Retune uses, and shows the clamped value when a
-// lower N has cut it (docs/design.md: the stored value is never rewritten).
+// accent) and one view, the dial (Views.hpp's ShiftDial): Divisions as an arc outside, Steps the
+// ring inside it, Octaves the ring inside that, each dragged round by its handle. Steps turns
+// through ±N, the range Retune uses, and shows the clamped value when a lower N has cut the stored
+// one (docs/design.md: the stored value is never rewritten).
 //
 // The editor reads every value on its timer and shows what changed, so host automation and a loaded
 // state need no push. Edits go out through DPF's editParameter / setParameterValue, which the
@@ -20,15 +19,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "EmbeddedResources.hpp"   // build-time: the logo's bytes
-#include "GroupBox.hpp"
-#include "Knob.hpp"
 #include "Logo.hpp"
 #include "RetuneCore.h"
 #include "Views.hpp"
@@ -37,11 +31,8 @@
 START_NAMESPACE_DISTRHO
 
 using DGL_NAMESPACE::Color;
-using DGL_NAMESPACE::GroupBox;
-using DGL_NAMESPACE::HeldView;
-using DGL_NAMESPACE::Knob;
 using DGL_NAMESPACE::Logo;
-using DGL_NAMESPACE::ShiftCircle;
+using DGL_NAMESPACE::ShiftDial;
 
 namespace {
 
@@ -52,13 +43,13 @@ const Color kAccent(150, 200, 110);
 const Color kWindow(26, 28, 33);
 
 // The design size, in points; resizable at its ratio from 0.8×.
-constexpr int kWidth = 760, kHeight = 480;
+constexpr int kWidth = 520, kHeight = 560;
 
 } // namespace
 
 // --- the editor --------------------------------------------------------------------------------
 
-class RetuneUI : public UI, public Knob::Callback, public ShiftCircle::Callback {
+class RetuneUI : public UI, public ShiftDial::Callback {
 public:
     RetuneUI() : UI(kWidth, kHeight) {
         fPlugin = static_cast<const clap_plugin_t*>(getPluginInstancePointer());
@@ -67,38 +58,11 @@ public:
 
         fLogo = std::make_unique<Logo>(this, EmbeddedResources::Unlikelyware_Final_ColorData,
                                        EmbeddedResources::Unlikelyware_Final_ColorDataSize);
-        fCircle = std::make_unique<ShiftCircle>(this, this);
-        fCircle->setAccent(kAccent);
-        fHeld = std::make_unique<HeldView>(this);
-        fHeld->setAccent(kAccent);
-
-        fBox = std::make_unique<GroupBox>(this);
-        fBox->setTitle("Shift");
-        fBox->setAccentColor(kAccent);
-        for (uint32_t id = 0; id < RT_PARAM_COUNT; ++id) {
-            rt_param_info_t info{};
-            if (fPlugin == nullptr || !rt_param_info(fPlugin, id, &info)) continue;
-            Control& c = fControls[id];
-            c.knob     = std::make_unique<Knob>(fBox.get(), this);
-            c.knob->setId(id);
-            c.knob->setLabel(info.name);
-            c.knob->setAccentColor(kAccent);
-            c.knob->configure(static_cast<float>(info.min), static_cast<float>(info.max), false,
-                              static_cast<float>(info.def));
-            c.knob->setInteger(true);
-            c.knob->setFormatter([id](float v) { return format(id, static_cast<int>(std::lround(v))); });
-            fBox->addControl(c.knob.get());
-        }
+        fDial = std::make_unique<ShiftDial>(this, this);
+        fDial->setAccent(kAccent);
 
         refresh(true);
         layout();
-    }
-
-    // A knob is a child of the box, and a DGL child unlinks itself from its parent as it goes: so
-    // the knobs go first, then the box.
-    ~RetuneUI() override {
-        for (Control& c : fControls) c.knob.reset();
-        fBox.reset();
     }
 
 protected:
@@ -107,53 +71,28 @@ protected:
         if (index < RT_PARAM_COUNT) show(index, value);
     }
 
-    // --- controls → the plugin ---
-    void knobDragStarted(Knob* k) override {
-        fControls[k->getId()].dragging = true;
-        editParameter(k->getId(), true);
+    // --- the dial → the plugin: a press, drag and release is one gesture, as a knob's ---
+    void dialDragStarted(int ring) override {
+        fDragging[ring] = true;
+        editParameter(static_cast<uint32_t>(ring), true);
     }
-    void knobDragFinished(Knob* k) override {
-        editParameter(k->getId(), false);
-        fControls[k->getId()].dragging = false;
+    void dialChanged(int ring, int value) override {
+        setParameterValue(static_cast<uint32_t>(ring), static_cast<float>(value));
+        fShown[ring] = static_cast<float>(value);
+        updateDial();
     }
-    void knobValueChanged(Knob* k, float v) override {
-        setParameterValue(k->getId(), v);
-        fControls[k->getId()].shown = v;
-        updateShift();
-    }
-    // The circle's dot, pressed and dragged: one gesture on Steps, as a knob's.
-    void stepDragStarted() override {
-        editParameter(RT_PARAM_STEPS, true);
-        fControls[RT_PARAM_STEPS].circleDragging = true;
-    }
-    void stepChanged(int steps) override {
-        setParameterValue(RT_PARAM_STEPS, static_cast<float>(steps));
-        show(RT_PARAM_STEPS, static_cast<float>(steps));
-    }
-    void stepDragFinished() override {
-        editParameter(RT_PARAM_STEPS, false);
-        fControls[RT_PARAM_STEPS].circleDragging = false;
+    void dialDragFinished(int ring) override {
+        editParameter(static_cast<uint32_t>(ring), false);
+        fDragging[ring] = false;
     }
 
-    // The timer: values, and what's held.
+    // The timer: the values.
     void uiIdle() override {
         if (!fInitialSizeNudged) {   // some Linux hosts apply the first size only once events run
             fInitialSizeNudged = true;
             setSize(getWidth(), getHeight());
         }
         refresh(false);
-        rt_live_t live;
-        if (fPlugin == nullptr || !rt_live_read(fPlugin, &live)) return;
-        std::vector<HeldView::Note> in, out;
-        for (uint32_t i = 0; i < live.inCount; ++i)
-            in.push_back({live.inPitch[i] / 512.0f, live.inVelocity[i] / 65535.0f});
-        for (uint32_t i = 0; i < live.outCount; ++i)
-            out.push_back({live.outPitch[i] / 512.0f, live.outVelocity[i] / 65535.0f});
-        if (!same(in, fIn) || !same(out, fOut)) {
-            fIn  = in;
-            fOut = out;
-            fHeld->setHeld(std::move(in), std::move(out));
-        }
     }
 
     void onNanoDisplay() override {
@@ -176,110 +115,54 @@ protected:
     }
 
 private:
-    struct Control {
-        std::unique_ptr<Knob> knob;
-        bool                  dragging       = false;
-        bool                  circleDragging = false;   // Steps, by the circle's dot
-        float                 shown          = 0.0f;
-    };
-
     float scale() const { return getWidth() / static_cast<float>(kWidth); }
 
-    // A knob's readout: Steps as Retune uses it, cut to ±N.
-    static std::string format(uint32_t id, int v) {
-        char text[32];
-        if (id == RT_PARAM_DIVISIONS) std::snprintf(text, sizeof(text), "%d-EDO", v);
-        else if (v == 0) std::snprintf(text, sizeof(text), "0");
-        else std::snprintf(text, sizeof(text), "%+d", v);
-        return text;
-    }
-
-    int value(uint32_t id) const { return static_cast<int>(std::lround(fControls[id].shown)); }
+    int value(uint32_t id) const { return static_cast<int>(std::lround(fShown[id])); }
 
     void show(uint32_t id, float v) {
-        Control& c = fControls[id];
-        c.shown    = v;
-        if (c.knob) c.knob->setRealValue(v, false), c.knob->repaint();
-        updateShift();
+        fShown[id] = v;
+        updateDial();
     }
 
-    // Every value from the plugin; what changed (or everything) is shown. A knob being dragged keeps
+    // Every value from the plugin; what changed (or everything) is shown. A ring being dragged keeps
     // what the drag says.
     void refresh(bool all) {
         if (fPlugin == nullptr) return;
         for (uint32_t i = 0; i < RT_PARAM_COUNT; ++i) {
             const float v = static_cast<float>(rt_param_value(fPlugin, i));
-            if (fControls[i].dragging || fControls[i].circleDragging) continue;
-            if (all || v != fControls[i].shown) show(i, v);
+            if (fDragging[i]) continue;
+            if (all || v != fShown[i]) show(i, v);
         }
     }
 
-    // The Steps knob's range follows N, and the circle shows the shift Retune uses.
-    void updateShift() {
+    // The dial shows the shift Retune uses: Steps cut to ±N.
+    void updateDial() {
         const retune::Params p = retune::clamped({value(RT_PARAM_DIVISIONS), value(RT_PARAM_OCTAVES), value(RT_PARAM_STEPS)});
-        if (Knob* steps = fControls[RT_PARAM_STEPS].knob.get(); steps != nullptr && p.divisions != fStepsRange) {
-            fStepsRange = p.divisions;
-            steps->configure(static_cast<float>(-p.divisions), static_cast<float>(p.divisions), false, 0.0f);
-        }
-        if (Knob* steps = fControls[RT_PARAM_STEPS].knob.get(); steps != nullptr && !fControls[RT_PARAM_STEPS].dragging) {
-            steps->setRealValue(static_cast<float>(p.steps), false);
-            steps->repaint();
-        }
-        if (fCircle) fCircle->setShift(p.divisions, p.octaves, p.steps);
+        if (fDial) fDial->setShift(p.divisions, p.octaves, p.steps);
     }
 
-    static bool same(const std::vector<HeldView::Note>& a, const std::vector<HeldView::Note>& b) {
-        if (a.size() != b.size()) return false;
-        for (std::size_t i = 0; i < a.size(); ++i)
-            if (a[i].pitch != b[i].pitch || a[i].velocity != b[i].velocity) return false;
-        return true;
-    }
-
-    // The circle down the left; the Shift group over what's held on the right.
     void layout() {
         const int   W = static_cast<int>(getWidth()), H = static_cast<int>(getHeight());
         const float s = scale();
-        const int   M = static_cast<int>(14 * s), gap = static_cast<int>(10 * s), hdr = static_cast<int>(46 * s);
+        const int   M = static_cast<int>(14 * s), hdr = static_cast<int>(46 * s);
 
         fLogo->setHeightPreservingAspect(22 * s);
         fLogo->setAbsolutePos(M, static_cast<int>(11 * s));
         fTitleX = static_cast<float>(M + static_cast<int>(fLogo->getWidth()) + static_cast<int>(12 * s));
 
-        const int leftW  = static_cast<int>(300 * s);
-        const int bottom = H - M;
-        fCircle->setUiScale(s);
-        fCircle->setAbsolutePos(M, hdr);
-        fCircle->setSize(static_cast<uint>(leftW), static_cast<uint>(bottom - hdr));
-
-        const int rx = M + leftW + gap, rw = W - M - rx, boxH = static_cast<int>(150 * s);
-        fBox->setUiScale(s);
-        fBox->setAbsolutePos(rx, hdr);
-        fBox->setSize(static_cast<uint>(rw), static_cast<uint>(boxH));
-        fBox->relayout();
-        fHeld->setUiScale(s);
-        fHeld->setAbsolutePos(rx, hdr + boxH + gap);
-        fHeld->setSize(static_cast<uint>(rw), static_cast<uint>(bottom - hdr - boxH - gap));
-
-        // Knobs as large as their cells allow, to the design's size.
-        for (Control& c : fControls)
-            if (c.knob) {
-                const float d = std::min({62.0f * s, static_cast<float>(c.knob->getHeight()) - 38.0f * s,
-                                          static_cast<float>(c.knob->getWidth()) - 6.0f});
-                c.knob->setDiameter(std::max(d, 16.0f), s);
-            }
+        fDial->setUiScale(s);
+        fDial->setAbsolutePos(M, hdr);
+        fDial->setSize(static_cast<uint>(W - 2 * M), static_cast<uint>(H - hdr - M));
     }
 
-    const clap_plugin_t*         fPlugin = nullptr;
-    Control                      fControls[RT_PARAM_COUNT];
-    std::unique_ptr<GroupBox>    fBox;
-    std::unique_ptr<ShiftCircle> fCircle;
-    std::unique_ptr<HeldView>    fHeld;
-    std::unique_ptr<Logo>        fLogo;
-    std::vector<HeldView::Note>  fIn, fOut;
-    int                          fStepsRange        = 0;
-    bool                         fHasFont           = false;
-    bool                         fInitialSizeNudged = false;
-    float                        fTitleX            = 16.0f;
+    const clap_plugin_t*       fPlugin = nullptr;
+    float                      fShown[RT_PARAM_COUNT]    = {};
+    bool                       fDragging[RT_PARAM_COUNT] = {};
+    std::unique_ptr<ShiftDial> fDial;
+    std::unique_ptr<Logo>      fLogo;
+    bool                       fHasFont           = false;
+    bool                       fInitialSizeNudged = false;
+    float                      fTitleX            = 16.0f;
 
     DISTRHO_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RetuneUI)
 };

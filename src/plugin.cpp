@@ -13,8 +13,7 @@
 // output event to the port whose id equals the event's port_index.
 //
 // The editor (src/UI/RetuneUI.cpp) reaches the plugin only through plugin_gui.h: its edits come
-// through a ring and are applied, and told to the host, at the next process() or flush; process()
-// publishes the notes held at the input and at the output (where they went) for its live view.
+// through a ring and are applied, and told to the host, at the next process() or flush.
 //
 // Building with RETUNE_DIALECT_LOG on adds a log of what the host sends (its supported note
 // dialects and a count of every incoming note event by kind), to learn what Bitwig, REAPER and
@@ -106,7 +105,7 @@ std::string logPath() {
 #endif
 
 // ---------------------------------------------------------------------------------------------
-// The editor's side: its edits in, what's held out
+// The editor's edits
 // ---------------------------------------------------------------------------------------------
 
 // Editor edits (main thread) → the audio thread, as NoteGran's: process() and flush() are never
@@ -142,128 +141,6 @@ private:
     std::atomic<uint32_t>     tail{0};
 };
 
-// The notes sounding on one side of Retune, for the editor's live view only: the core's own
-// latches decide where notes go. Keyed as the events address them: port, group × 16 + channel,
-// key, and a CLAP note id (-1 for MIDI). An event's -1 fields are wildcards, as in CLAP.
-class Held {
-public:
-    void on(int port, int channel, int key, int32_t noteId, uint16_t pitch79, uint16_t velocity) {
-        off(port, channel, key, -1);   // a retrigger replaces the note
-        if (count_ == RT_LIVE_NOTES) remove(0);
-        notes_[count_++] = {port, channel, key, noteId, pitch79, velocity};
-        dirty = true;
-    }
-    void off(int port, int channel, int key, int32_t noteId) {
-        for (uint32_t i = count_; i-- > 0;)
-            if (matches(notes_[i], port, channel, key, noteId)) remove(i);
-    }
-    // A CLAP tuning expression: the note's pitch is its key plus `semitones`.
-    void tune(int port, int channel, int key, int32_t noteId, double semitones) {
-        for (uint32_t i = 0; i < count_; ++i) {
-            Note& n = notes_[i];
-            if (!matches(n, port, channel, key, noteId)) continue;
-            n.pitch79 = uint16_t(std::clamp(std::lround((n.key + semitones) * 512.0), 0L, 0xFFFFL));
-            dirty     = true;
-        }
-    }
-    void clear() {
-        if (count_ != 0) dirty = true;
-        count_ = 0;
-    }
-
-    uint32_t count() const { return count_; }
-    uint32_t packed(uint32_t i) const { return uint32_t(notes_[i].pitch79) << 16 | notes_[i].velocity; }
-
-    bool dirty = true;   // changed since last published
-
-private:
-    struct Note {
-        int      port, channel, key;
-        int32_t  noteId;
-        uint16_t pitch79, velocity;
-    };
-    static bool matches(const Note& n, int port, int channel, int key, int32_t noteId) {
-        if (noteId != -1 && n.noteId != -1) return n.noteId == noteId;
-        return (port == -1 || n.port == port) && (channel == -1 || n.channel == channel) &&
-               (key == -1 || n.key == key);
-    }
-    void remove(uint32_t i) {
-        std::memmove(notes_ + i, notes_ + i + 1, (count_ - i - 1) * sizeof(Note));
-        --count_;
-        dirty = true;
-    }
-
-    Note     notes_[RT_LIVE_NOTES]{};
-    uint32_t count_ = 0;
-};
-
-// One UMP's effect on what's held: notes on and off, All Sound Off and All Notes Off.
-void watchUmp(Held& held, int port, const uw::MidiMessage& m) {
-    if (!ump::isChannelVoice(m)) return;
-    const int channel = int((m.words[0] >> 24) & 0xF) * 16 + ump::channel(m);
-    const int key     = ump::noteNumber(m);
-    if (ump::isNoteOn(m))
-        held.on(port, channel, key, -1, ump::notePitch79(m), ump::velocity16(m));
-    else if (ump::isNoteOff(m))
-        held.off(port, channel, key, -1);
-    else if (ump::status(m) == ump::Status::ControlChange && (key == 120 || key == 123))
-        held.off(port, channel, -1, -1);
-}
-
-// One event's effect on what's held, in any of the three dialects.
-void watch(Held& held, const clap_event_header_t* h) {
-    if (h->space_id != CLAP_CORE_EVENT_SPACE_ID) return;
-    switch (h->type) {
-        case CLAP_EVENT_NOTE_ON: {
-            const auto* ev = reinterpret_cast<const clap_event_note_t*>(h);
-            if (ev->key < 0 || ev->key > 127) return;
-            held.on(ev->port_index, ev->channel, ev->key, ev->note_id, uint16_t(ev->key << 9),
-                    uint16_t(std::clamp(ev->velocity, 0.0, 1.0) * 65535.0));
-            break;
-        }
-        case CLAP_EVENT_NOTE_OFF:
-        case CLAP_EVENT_NOTE_CHOKE: {
-            const auto* ev = reinterpret_cast<const clap_event_note_t*>(h);
-            held.off(ev->port_index, ev->channel, ev->key, ev->note_id);
-            break;
-        }
-        case CLAP_EVENT_NOTE_EXPRESSION: {
-            const auto* ev = reinterpret_cast<const clap_event_note_expression_t*>(h);
-            if (ev->expression_id == CLAP_NOTE_EXPRESSION_TUNING)
-                held.tune(ev->port_index, ev->channel, ev->key, ev->note_id, ev->value);
-            break;
-        }
-        case CLAP_EVENT_MIDI: {
-            const auto* ev = reinterpret_cast<const clap_event_midi_t*>(h);
-            if (ev->data[0] < 0x80 || ev->data[0] >= 0xF0) return;
-            uw::MidiMessage m;
-            m.words[0]  = 0x2000'0000u | (uint32_t(ev->data[0]) << 16) | (uint32_t(ev->data[1] & 0x7F) << 8) |
-                          uint32_t(ev->data[2] & 0x7F);
-            m.wordCount = 1;
-            watchUmp(held, ev->port_index, m);
-            break;
-        }
-        case CLAP_EVENT_MIDI2: {
-            const auto* ev = reinterpret_cast<const clap_event_midi2_t*>(h);
-            uw::MidiMessage m;
-            std::memcpy(m.words, ev->data, sizeof(m.words));
-            m.wordCount = ump::wordCountForType(uint8_t(m.words[0] >> 28));
-            watchUmp(held, ev->port_index, m);
-            break;
-        }
-        default: break;
-    }
-}
-
-// What's held, for the editor (rt_live_t, packed as pitch << 16 | velocity): written whole when it
-// changed, at the end of process(), under a sequence count; read by the editor's timer.
-struct LiveShared {
-    static constexpr std::size_t kOutBase = 1 + RT_LIVE_NOTES;   // the input's count, then its notes
-    static constexpr std::size_t kWords   = kOutBase + 1 + RT_LIVE_NOTES;
-    std::atomic<uint32_t>        seq{0};
-    std::atomic<uint32_t>        words[kWords]{};
-};
-
 // ---------------------------------------------------------------------------------------------
 // The plugin
 // ---------------------------------------------------------------------------------------------
@@ -284,8 +161,6 @@ struct Plugin {
     // The editor (plugin_gui.h).
     void*       gui = nullptr;   // the editor's own state, held for it
     GuiEditRing guiEdits;
-    Held        heldIn, heldOut;   // audio thread while active, main thread otherwise
-    LiveShared  live;
 
 #ifdef RETUNE_DIALECT_LOG
     std::atomic<uint64_t> counts[kKindCount];
@@ -348,37 +223,6 @@ bool applyGuiEdits(Plugin* p, const clap_output_events_t* out) {
     }
     if (changed) applyParams(p);
     return changed;
-}
-
-// What's held, published for the editor when it changed (rt_live_read).
-void publishLive(Plugin* p) {
-    if (!p->heldIn.dirty && !p->heldOut.dirty) return;
-    p->heldIn.dirty = p->heldOut.dirty = false;
-    LiveShared&    l = p->live;
-    const uint32_t s = l.seq.load(std::memory_order_relaxed);
-    l.seq.store(s + 1, std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_release);
-    l.words[0].store(p->heldIn.count(), std::memory_order_relaxed);
-    for (uint32_t i = 0; i < p->heldIn.count(); ++i)
-        l.words[1 + i].store(p->heldIn.packed(i), std::memory_order_relaxed);
-    l.words[LiveShared::kOutBase].store(p->heldOut.count(), std::memory_order_relaxed);
-    for (uint32_t i = 0; i < p->heldOut.count(); ++i)
-        l.words[LiveShared::kOutBase + 1 + i].store(p->heldOut.packed(i), std::memory_order_relaxed);
-    l.seq.store(s + 2, std::memory_order_release);
-}
-
-// The host's output list, watched on the way out so the editor sees where each note went.
-struct WatchedOut {
-    clap_output_events_t       events;
-    const clap_output_events_t* inner;
-    Held*                      held;
-};
-
-bool watchedTryPush(const clap_output_events_t* list, const clap_event_header_t* h) {
-    const auto* w = static_cast<const WatchedOut*>(list->ctx);
-    if (w->inner == nullptr || w->inner->try_push == nullptr || !w->inner->try_push(w->inner, h)) return false;
-    watch(*w->held, h);
-    return true;
 }
 
 #ifdef RETUNE_DIALECT_LOG
@@ -545,9 +389,6 @@ bool plug_activate(const clap_plugin_t* plugin, double, uint32_t, uint32_t) {
     Plugin* p = self(plugin);
     p->core.reset();
     p->clapNotes.reset();
-    p->heldIn.clear();
-    p->heldOut.clear();
-    publishLive(p);
     applyParams(p);
     p->valuesChangedByState.store(false, std::memory_order_relaxed);
     return true;
@@ -565,12 +406,8 @@ bool plug_start_processing(const clap_plugin_t*) { return true; }
 void plug_stop_processing(const clap_plugin_t*) {}
 
 void plug_reset(const clap_plugin_t* plugin) {
-    Plugin* p = self(plugin);
-    p->core.reset();
-    p->clapNotes.reset();
-    p->heldIn.clear();
-    p->heldOut.clear();
-    publishLive(p);
+    self(plugin)->core.reset();
+    self(plugin)->clapNotes.reset();
 }
 
 clap_process_status plug_process(const clap_plugin_t* plugin, const clap_process_t* process) {
@@ -579,16 +416,10 @@ clap_process_status plug_process(const clap_plugin_t* plugin, const clap_process
         applyParams(p);
     applyGuiEdits(p, process->out_events);
 
-    WatchedOut out{{nullptr, watchedTryPush}, process->out_events, &p->heldOut};
-    out.events.ctx = &out;
     const clap_input_events_t* in = process->in_events;
     const uint32_t count = in != nullptr ? in->size(in) : 0;
-    for (uint32_t i = 0; i < count; ++i) {
-        const clap_event_header_t* h = in->get(in, i);
-        watch(p->heldIn, h);
-        handleEvent(p, h, &out.events);
-    }
-    publishLive(p);
+    for (uint32_t i = 0; i < count; ++i)
+        handleEvent(p, in->get(in, i), process->out_events);
     return CLAP_PROCESS_CONTINUE;
 }
 
@@ -835,15 +666,6 @@ const clap_host_t* rt_plugin_host(const clap_plugin_t* plugin) { return self(plu
 void  rt_plugin_set_gui(const clap_plugin_t* plugin, void* gui) { self(plugin)->gui = gui; }
 void* rt_plugin_get_gui(const clap_plugin_t* plugin) { return self(plugin)->gui; }
 
-bool rt_param_info(const clap_plugin_t*, uint32_t index, rt_param_info_t* info) {
-    if (index >= kParamCount) return false;
-    info->name = kParams[index].name;
-    info->min  = kParams[index].min;
-    info->max  = kParams[index].max;
-    info->def  = kParams[index].def;
-    return true;
-}
-
 double rt_param_value(const clap_plugin_t* plugin, uint32_t index) {
     return index < kParamCount ? self(plugin)->values[index].load(std::memory_order_relaxed) : 0.0;
 }
@@ -864,25 +686,6 @@ void rt_param_set_from_gui(const clap_plugin_t* plugin, uint32_t index, double v
 
 void rt_param_end_gesture(const clap_plugin_t* plugin, uint32_t index) {
     self(plugin)->guiEdits.push({GuiEdit::End, index, 0.0});
-}
-
-bool rt_live_read(const clap_plugin_t* plugin, rt_live_t* out) {
-    LiveShared&    l = self(plugin)->live;
-    const uint32_t s = l.seq.load(std::memory_order_acquire);
-    if (s & 1) return false;
-    uint32_t w[LiveShared::kWords];
-    for (std::size_t i = 0; i < LiveShared::kWords; ++i) w[i] = l.words[i].load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_acquire);
-    if (l.seq.load(std::memory_order_relaxed) != s) return false;
-    out->inCount  = std::min<uint32_t>(w[0], RT_LIVE_NOTES);
-    out->outCount = std::min<uint32_t>(w[LiveShared::kOutBase], RT_LIVE_NOTES);
-    for (std::size_t i = 0; i < RT_LIVE_NOTES; ++i) {
-        out->inPitch[i]     = uint16_t(w[1 + i] >> 16);
-        out->inVelocity[i]  = uint16_t(w[1 + i]);
-        out->outPitch[i]    = uint16_t(w[LiveShared::kOutBase + 1 + i] >> 16);
-        out->outVelocity[i] = uint16_t(w[LiveShared::kOutBase + 1 + i]);
-    }
-    return true;
 }
 
 } // extern "C"

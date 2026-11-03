@@ -38,9 +38,9 @@ source only.
 | Octaves | −4 … +4 | 0 |
 | Steps | −N … +N, in steps of 1/N octave | 0 |
 
-The editor shows the shift on a circle of N steps, in cents, and how far MIDI 1.0's rounding is
-from it; drag the dot round the circle, or click a step, to set Steps. Below the knobs, each note you hold is drawn
-over a keyboard with the pitch Retune sent it to.
+The editor is one dial: Divisions as an arc round the outside, Steps the ring inside it and
+Octaves the ring inside that. Drag a handle round its ring, or scroll over it; double-click to put
+it back. The middle shows the shift in cents, and below it how far MIDI 1.0's rounding is from it.
 
 The shift is `12 × Octaves + 12 × Steps / N` semitones. Lowering Divisions clamps Steps to the
 new range. Notes shifted out of MIDI's 0–127 range are dropped. Everything that isn't a note
