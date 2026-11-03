@@ -14,7 +14,7 @@
 namespace retune {
 
 // Parameter ranges (docs/design.md, "Parameters").
-inline constexpr int kMinDivisions = 1;
+inline constexpr int kMinDivisions = 5;   // below 5, every N divides 12: nothing 12-EDO can't do
 inline constexpr int kMaxDivisions = 96;
 inline constexpr int kMaxOctaves   = 4;
 

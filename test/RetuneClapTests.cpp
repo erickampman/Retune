@@ -290,7 +290,7 @@ void testParams() {
     if (!r.ok()) return;
     CHECK(r.params->count(r.plugin) == 3);
     const char* names[] = {"Divisions", "Octaves", "Steps"};
-    const double ranges[][3] = {{1, 96, 12}, {-4, 4, 0}, {-96, 96, 0}};
+    const double ranges[][3] = {{5, 96, 12}, {-4, 4, 0}, {-96, 96, 0}};
     for (uint32_t i = 0; i < 3; ++i) {
         clap_param_info_t info{};
         CHECK(r.params->get_info(r.plugin, i, &info));

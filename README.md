@@ -1,7 +1,7 @@
 # Retune
 
 A MIDI note effect from Unlikelyware that transposes every note by a fixed interval in any
-equal division of the octave (EDO): whole octaves plus steps of 1/N octave, for N from 1 to 96.
+equal division of the octave (EDO): whole octaves plus steps of 1/N octave, for N from 5 to 96.
 Put it in front of a synth and a 12-TET keyboard plays in 19-EDO, 31-EDO or 36-EDO steps.
 
 Retune makes no sound of its own. It changes the notes going to the synth after it.
@@ -34,7 +34,7 @@ source only.
 
 | Parameter | Range | Default |
 |---|---|---|
-| Divisions | 1 … 96: N, the steps per octave | 12 |
+| Divisions | 5 … 96: N, the steps per octave | 12 |
 | Octaves | −4 … +4 | 0 |
 | Steps | −N … +N, in steps of 1/N octave | 0 |
 

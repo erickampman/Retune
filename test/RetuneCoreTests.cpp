@@ -64,11 +64,11 @@ void testShift() {
         {{31, -1, 5}, -5153, -10},     // -10.065
         {{24, 0, 1}, 256, 1},          // a half rounds away from zero...
         {{24, 0, -1}, -256, -1},       // ...both ways
-        {{1, 0, 1}, 6144, 12},         // one step of 1-EDO is an octave
+        {{5, 0, 1}, 1229, 2},          // one step of 5-EDO is 2.4 semitones
         {{12, 0, 20}, 6144, 12},       // Steps clamped to +N
         {{5, 0, -9}, -6144, -12},      // and to -N
         {{200, 0, 1}, 64, 0},          // N clamped to 96
-        {{0, 0, 1}, 6144, 12},         // and to 1
+        {{0, 0, 1}, 1229, 2},          // and to 5
         {{12, 9, 0}, 4 * 6144, 48},    // Octaves clamped to ±4
         {{12, -9, 0}, -4 * 6144, -48},
     };

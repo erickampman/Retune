@@ -2,7 +2,7 @@
 // RetuneUI.cpp; it tells the editor of drags and never talks to the plugin.
 //
 // ShiftDial: all three parameters as rings round one centre.
-// - Divisions, outside: an arc of 270° with its gap at the bottom, 1 at the lower left to 96 at the
+// - Divisions, outside: an arc of 270° with its gap at the bottom, 5 at the lower left to 96 at the
 //   lower right, the common EDOs marked.
 // - Steps, the middle ring: the octave as N steps, 0 at the top, 12-TET's semitones ticked outside
 //   it; an arc from 0 to where Steps lands (clockwise up, anticlockwise down).
@@ -25,6 +25,8 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+
+#include "RetuneCore.h"   // the parameters' ranges
 
 START_NAMESPACE_DGL
 
@@ -75,7 +77,7 @@ public:
     // the drag's value.
     void setShift(int divisions, int octaves, int steps)
     {
-        if (fDragging != kDivisions) fN = std::clamp(divisions, 1, 96);
+        if (fDragging != kDivisions) fN = std::clamp(divisions, kMinN, kMaxN);
         if (fDragging != kOctaves) fOctaves = octaves;
         if (fDragging != kSteps) fSteps = steps;
         fSteps = std::clamp(fSteps, -fN, fN);
@@ -215,7 +217,8 @@ private:
 
     static constexpr float kDivStart = 0.75f * views::kPi, kDivSweep = 1.5f * views::kPi;   // lower left, clockwise
     static float top(float turn) { return -0.5f * views::kPi + views::kTau * turn; }        // 0 at the top, clockwise
-    float divAngle(int n) const { return kDivStart + kDivSweep * static_cast<float>(n - 1) / 95.0f; }
+    static constexpr int kMinN = retune::kMinDivisions, kMaxN = retune::kMaxDivisions;
+    float divAngle(int n) const { return kDivStart + kDivSweep * static_cast<float>(n - kMinN) / (kMaxN - kMinN); }
     float stepAngle(int k) const { return top(static_cast<float>(k) / static_cast<float>(fN)); }
     static float octAngle(int k) { return top(static_cast<float>(k) / 4.0f); }   // an octave a quarter turn
 
@@ -223,7 +226,7 @@ private:
 
     void set(int ring, int v)
     {
-        if (ring == kDivisions) v = std::clamp(v, 1, 96);
+        if (ring == kDivisions) v = std::clamp(v, kMinN, kMaxN);
         else if (ring == kOctaves) v = std::clamp(v, -4, 4);
         else v = std::clamp(v, -fN, fN);
         if (v == value(ring)) return;
@@ -266,10 +269,10 @@ private:
             // In the gap: a press takes the nearer end, a drag stays at the end it went past.
             if (t > kDivSweep)
             {
-                const bool high = fresh ? t - kDivSweep < (views::kTau - kDivSweep) * 0.5f : fN > 48;
+                const bool high = fresh ? t - kDivSweep < (views::kTau - kDivSweep) * 0.5f : fN > (kMinN + kMaxN) / 2;
                 t = high ? kDivSweep : 0.0f;
             }
-            set(ring, 1 + static_cast<int>(std::lround(t / kDivSweep * 95.0f)));
+            set(ring, kMinN + static_cast<int>(std::lround(t / kDivSweep * static_cast<float>(kMaxN - kMinN))));
             return;
         }
         const int places = ring == kOctaves ? 4 : fN;
@@ -327,7 +330,7 @@ private:
         strokeColor(withAlpha(fAccent, 0.55f)); strokeWidth(5.0f * s); stroke();
         lineCap(BUTT);
         // The common EDOs, marked and named.
-        static const int kMarks[] = {1, 5, 12, 19, 22, 24, 31, 41, 53, 72, 96};
+        static const int kMarks[] = {5, 7, 12, 19, 22, 24, 31, 41, 53, 72, 96};
         for (int m : kMarks)
         {
             const float a = divAngle(m);

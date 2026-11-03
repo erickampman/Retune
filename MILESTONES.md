@@ -9,7 +9,7 @@
 
 ## M0: Plan
 - [x] docs/design.md: fixed EDO transpose, MIDI 2.0 base case, Pitch 7.9 out, latching, clap-wrapper survey
-- [x] Parameters: Divisions (1–96), Octaves (±4), Steps (clamped to ±N)
+- [x] Parameters: Divisions (5–96; 1–96 until 2026-11-03), Octaves (±4), Steps (clamped to ±N)
 - [x] Repo erickampman/Retune, MIT
 - [x] UMP code from uw-core's uw::ump, not Retune's own
 - [x] CLAP note dialect: add it (M3), since Bitwig sends plugins no MIDI 2.0 (2026-10-21)

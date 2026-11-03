@@ -36,7 +36,8 @@ would take wrapper patches (see the last phase).
 ## Behaviour
 
 - **Parameters** (appended, never inserted, as in the synths):
-  - 0 `Divisions`: N, the number of equal steps per octave. Integer, 1 … 96, default 12.
+  - 0 `Divisions`: N, the number of equal steps per octave. Integer, 5 … 96, default 12. (1 … 96 until
+    2026-11-03: below 5 every N divides 12, so 12-EDO already makes every shift they can.)
   - 1 `Octaves`: integer, −4 … +4, default 0.
   - 2 `Steps`: integer, limited to −N … +N, default 0. Steps of 1/N octave; Octaves covers anything
     larger. CLAP parameter ranges are fixed, so the host sees −96 … +96 (max N), and Retune uses
@@ -146,8 +147,8 @@ Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut d
 - **One dial, 520 × 560,** resizable at that ratio from 0.8× (2026-11-03, after a first try with
   knobs and a keyboard of held notes, in 841b0e5). Every parameter is a ring round one centre, named
   just inside its top, its handle carrying its value:
-  - **Divisions** outside, an arc of 270° with the gap at the bottom, 1 at the lower left to 96 at
-    the lower right, the common EDOs (5, 12, 19, 22, 24, 31, 41, 53, 72) marked.
+  - **Divisions** outside, an arc of 270° with the gap at the bottom, 5 at the lower left to 96 at
+    the lower right, the common EDOs (7, 12, 19, 22, 24, 31, 41, 53, 72) marked.
   - **Steps** the middle ring: the octave as N steps, 0 at the top, 12-TET's semitones ticked
     outside it, an arc from 0 to where Steps lands (clockwise up). It turns through ±N, the range
     Retune uses, and shows the clamped value when a lower N has cut the stored one (the stored value
