@@ -6,13 +6,13 @@
 //   lower right, the common EDOs marked.
 // - Steps, the middle ring: the octave as N steps, 0 at the top, 12-TET's semitones ticked outside
 //   it; an arc from 0 to where Steps lands (clockwise up, anticlockwise down).
-// - Octaves, inside: an arc of 270° like Divisions', its gap at the bottom: −4 at the lower left,
-//   0 at the top, +4 at the lower right.
+// - Octaves, inside: a circle of four places, as Steps' of N: a quarter turn an octave, a whole
+//   turn clockwise +4 and anticlockwise −4.
 // Each ring is named just inside its top, and each handle carries its value. In the middle the whole shift in cents; in the gap below, the
 // shift in words and what MIDI 1.0 rounds it to.
 //
-// A ring's handle drags round it (Steps carries on past the bottom to ±N rather than flipping sign;
-// a drag into an arc's gap stays at the end it went past); a press elsewhere on a ring jumps there first; a double-click puts it back to
+// A ring's handle drags round it (Steps and Octaves carry on round to their ends, ±N and ±4, rather
+// than flipping sign; a drag into Divisions' gap stays at the end it went past); a press elsewhere on a ring jumps there first; a double-click puts it back to
 // its default; the scroll wheel moves it a step. Each press, drag and release (and each scroll step)
 // is one gesture.
 
@@ -217,8 +217,7 @@ private:
     static float top(float turn) { return -0.5f * views::kPi + views::kTau * turn; }        // 0 at the top, clockwise
     float divAngle(int n) const { return kDivStart + kDivSweep * static_cast<float>(n - 1) / 95.0f; }
     float stepAngle(int k) const { return top(static_cast<float>(k) / static_cast<float>(fN)); }
-    static constexpr float kOctStep = 0.1875f * views::kPi;   // 270° over the nine places, 0 at the top
-    static float octAngle(int k) { return -0.5f * views::kPi + kOctStep * static_cast<float>(k); }
+    static float octAngle(int k) { return top(static_cast<float>(k) / 4.0f); }   // an octave a quarter turn
 
     int value(int ring) const { return ring == kDivisions ? fN : ring == kOctaves ? fOctaves : fSteps; }
 
@@ -252,10 +251,10 @@ private:
         return std::hypot(px - (hx - fCx), py - (hy - fCy)) < handleRadius() * 1.4f;
     }
 
-    // The value at a point on a ring. On an arc, a point in its gap means an end: on a press the nearer
-    // one, in a drag the one it went past. Steps goes round: of the places the angle could mean, the
-    // one nearest the value now (so a drag carries on past the bottom), or on a fresh press, the
-    // nearer way round from 0.
+    // The value at a point on a ring. On Divisions' arc, a point in its gap means an end: on a press
+    // the nearer one, in a drag the one it went past. Steps and Octaves go round: of the places the
+    // angle could mean, the one nearest the value now (so a drag carries on round), or on a fresh
+    // press, the nearer way round from 0.
     void follow(int ring, float px, float py, bool fresh)
     {
         float turn = (std::atan2(py, px) + 0.5f * views::kPi) / views::kTau;   // 0 at the top, clockwise
@@ -273,16 +272,7 @@ private:
             set(ring, 1 + static_cast<int>(std::lround(t / kDivSweep * 95.0f)));
             return;
         }
-        if (ring == kOctaves)
-        {
-            float from0 = std::atan2(py, px) + 0.5f * views::kPi;   // from the top, clockwise, −π … π
-            if (from0 > views::kPi) from0 -= views::kTau;
-            int k = static_cast<int>(std::lround(from0 / kOctStep));
-            if (std::abs(k) > 4) k = fresh || fOctaves == 0 ? (k > 0 ? 4 : -4) : (fOctaves > 0 ? 4 : -4);
-            set(ring, k);
-            return;
-        }
-        const int places = fN;
+        const int places = ring == kOctaves ? 4 : fN;
         const int k      = static_cast<int>(std::lround(turn * static_cast<float>(places))) % places;
         int       best   = 2 * k <= places ? k : k - places;
         if (!fresh)
@@ -390,9 +380,8 @@ private:
     {
         using namespace views;
         const float s = fUiScale;
-        beginPath(); arc(fCx, fCy, fROct, octAngle(-4), octAngle(4), CW);
-        strokeColor(kTrack); strokeWidth(1.5f * s); stroke();
-        for (int k = -4; k <= 4; ++k)
+        beginPath(); circle(fCx, fCy, fROct); strokeColor(kTrack); strokeWidth(1.5f * s); stroke();
+        for (int k = 0; k < 4; ++k)
         {
             const float a = octAngle(k);
             beginPath(); circle(fCx + fROct * std::cos(a), fCy + fROct * std::sin(a), (k == 0 ? 3.6f : 2.8f) * s);
@@ -400,20 +389,12 @@ private:
         }
         if (fOctaves != 0)
         {
-            beginPath(); arc(fCx, fCy, fROct, octAngle(0), octAngle(fOctaves), fOctaves > 0 ? CW : CCW);
+            // Past a whole turn (±4) the arc overlaps itself: drawn as the full ring.
+            beginPath();
+            if (std::abs(fOctaves) == 4) circle(fCx, fCy, fROct);
+            else arc(fCx, fCy, fROct, octAngle(0), octAngle(fOctaves), fOctaves > 0 ? CW : CCW);
             strokeColor(withAlpha(fAccent, 0.9f)); strokeWidth(4.0f * s); stroke();
         }
-        if (fHasFont)   // the ends named, as Divisions' are
-            for (int k : {-4, 4})
-            {
-                const float a = octAngle(k);
-                fontFace(NANOVG_DEJAVU_SANS_TTF);
-                fontSize(9.5f * s);
-                textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
-                fillColor(k == fOctaves ? kText : kDim);
-                text(fCx + (fROct - 15.0f * s) * std::cos(a), fCy + (fROct - 15.0f * s) * std::sin(a),
-                     signedText(k).c_str(), nullptr);
-            }
         drawHandle(kOctaves, signedText(fOctaves).c_str());
     }
 

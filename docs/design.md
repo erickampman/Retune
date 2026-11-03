@@ -152,12 +152,12 @@ Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut d
     outside it, an arc from 0 to where Steps lands (clockwise up). It turns through ±N, the range
     Retune uses, and shows the clamped value when a lower N has cut the stored one (the stored value
     is still never rewritten, as above).
-  - **Octaves** inside: an arc of 270° like Divisions', its gap at the bottom, −4 at the lower left,
-    0 at the top, +4 at the lower right.
+  - **Octaves** inside: a circle of four places, as Steps' of N: an octave a quarter turn, a whole
+    turn clockwise +4 and anticlockwise −4.
   - In the middle the whole shift in cents; in the arc's gap the shift in words and what MIDI 1.0
     rounds it to ("+14 semitones, 10.5¢ sharp").
-- **Handling:** a handle drags round its ring; Steps carries on past the bottom to ±N rather than
-  flipping sign, and a drag into Divisions' or Octaves' gap stays at the end it went past. A
+- **Handling:** a handle drags round its ring; Steps and Octaves carry on round to their ends (±N,
+  ±4) rather than flipping sign, and a drag into Divisions' gap stays at the end it went past. A
   press elsewhere on a ring jumps there (the nearer way round from 0), a double-click restores the
   default, the scroll wheel moves a step. Each press, drag and release, and each scroll step, is one
   gesture.
