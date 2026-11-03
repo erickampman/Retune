@@ -29,9 +29,9 @@ const clap_host_t* rt_plugin_host(const clap_plugin_t* plugin);
 void  rt_plugin_set_gui(const clap_plugin_t* plugin, void* gui);
 void* rt_plugin_get_gui(const clap_plugin_t* plugin);
 
-// The parameters' ids (plugin.cpp's kParams): appended, never moved. All three are whole numbers;
-// their ranges are RetuneCore.h's.
-enum { RT_PARAM_DIVISIONS = 0, RT_PARAM_OCTAVES = 1, RT_PARAM_STEPS = 2, RT_PARAM_COUNT = 3 };
+// The parameters' ids (plugin.cpp's kParams): appended, never moved. All are whole numbers: the first
+// three's ranges are RetuneCore.h's, Dry is 0 (Off) or 1 (On).
+enum { RT_PARAM_DIVISIONS = 0, RT_PARAM_OCTAVES = 1, RT_PARAM_STEPS = 2, RT_PARAM_DRY = 3, RT_PARAM_COUNT = 4 };
 
 double rt_param_value(const clap_plugin_t* plugin, uint32_t index);
 

@@ -44,6 +44,8 @@ would take wrapper patches (see the last phase).
     `clamp(Steps, −N, +N)`. Lowering N therefore clamps the shift at once, and the GUI shows the
     clamped value. The stored value is not rewritten, because a plugin-initiated change would fight
     host automation.
+  - 3 `Dry`: Off (0) or On (1), default Off; added 2026-11-03. The original notes go out as well as
+    the shifted ones ("Dry", below).
 - **Shift** in semitones = `12 × Octaves + 12 × Steps / N` (in cents: `1200 × Octaves + 1200 × Steps / N`).
   With N = 12 every shift is a whole semitone, so MIDI 1.0 output is exact.
 - **Output format follows the input format.** An event that arrives as MIDI 1.0 leaves as MIDI 1.0.
@@ -64,6 +66,18 @@ would take wrapper patches (see the last phase).
   per-note messages.
 - **Everything else** (CCs, channel pitch bend, program change, SysEx, clock) passes through
   unchanged, at its original sample offset.
+- **Dry** (2026-11-03, asked for as a checkbox "to pass the original message through"): a Note On
+  also goes out unchanged, just before the shifted one, unless the shifted note lands on its own
+  key (no shift, or a small one that rounds there): a channel can't hold two notes on one key, so
+  then only the shifted note plays. Dry notes are latched too (`RetuneCore` for MIDI, `ClapDry` in
+  plugin.cpp for CLAP notes): Note Off, poly pressure, MIDI 2.0 per-note messages and CLAP note
+  expressions reach a dry note unchanged while it sounds, whatever Dry is by then, and All Notes
+  Off / All Sound Off and reset forget them. Channel messages go out once. CLAP copies carry
+  note_id −1, leaving the host's id to the shifted note. Not handled: a dry note and *another*
+  key's shifted note on one key (C4 and C5 held, an octave up): both go out, and the receiver
+  decides (a synth that stacks voices plays both; one that retriggers ends the sound at the first
+  Note Off). Kept in Retune rather than uw-core's NoteRemap, whose owner table would be the place to
+  handle that, until another note effect wants it.
 - All Notes Off / All Sound Off clear that group and channel's latches; host `reset()` clears them all.
 - **Retrigger:** a Note On for a key that is already sounding, whose new output key differs (or is out
   of range), first sends a Note Off for the old output key, so it can't hang.
@@ -157,6 +171,8 @@ Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut d
     turn clockwise +4 and anticlockwise −4.
   - In the middle the whole shift in cents; in the arc's gap the shift in words and what MIDI 1.0
     rounds it to ("+14 semitones, 10.5¢ sharp").
+- **Dry** is a checkbox at the header's right ("Dry: the originals too"), NoteGran's Toggle with
+  its label beside the box.
 - **Handling:** a handle drags round its ring; Steps and Octaves carry on round to their ends (±N,
   ±4) rather than flipping sign, and a drag into Divisions' gap stays at the end it went past. A
   press elsewhere on a ring jumps there (the nearer way round from 0), a double-click restores the

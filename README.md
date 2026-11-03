@@ -37,6 +37,7 @@ source only.
 | Divisions | 5 … 96: N, the steps per octave | 12 |
 | Octaves | −4 … +4 | 0 |
 | Steps | −N … +N, in steps of 1/N octave | 0 |
+| Dry | Off, On: the original notes too | Off |
 
 The editor is one dial: Divisions as an arc round the outside, Steps the ring inside it and
 Octaves the ring inside that. Drag a handle round its ring, or scroll over it; double-click to put
@@ -45,6 +46,10 @@ it back. The middle shows the shift in cents, and below it how far MIDI 1.0's ro
 The shift is `12 × Octaves + 12 × Steps / N` semitones. Lowering Divisions clamps Steps to the
 new range. Notes shifted out of MIDI's 0–127 range are dropped. Everything that isn't a note
 (CCs, channel pitch bend, program change, SysEx, clock) passes through unchanged.
+
+With Dry on, each note also plays unshifted, so you hear the original and the shifted note
+together. A note whose shift rounds to its own key plays once, shifted: a channel can't sound one
+key twice.
 
 ## Which hosts keep the fraction
 

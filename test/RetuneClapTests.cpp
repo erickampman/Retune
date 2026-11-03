@@ -288,10 +288,10 @@ void testWrappedPrefersMidi1() {
 void testParams() {
     Instance r;
     if (!r.ok()) return;
-    CHECK(r.params->count(r.plugin) == 3);
-    const char* names[] = {"Divisions", "Octaves", "Steps"};
-    const double ranges[][3] = {{5, 96, 12}, {-4, 4, 0}, {-96, 96, 0}};
-    for (uint32_t i = 0; i < 3; ++i) {
+    CHECK(r.params->count(r.plugin) == 4);
+    const char* names[] = {"Divisions", "Octaves", "Steps", "Dry"};
+    const double ranges[][3] = {{5, 96, 12}, {-4, 4, 0}, {-96, 96, 0}, {0, 1, 0}};
+    for (uint32_t i = 0; i < 4; ++i) {
         clap_param_info_t info{};
         CHECK(r.params->get_info(r.plugin, i, &info));
         CHECK(info.id == i && std::strcmp(info.name, names[i]) == 0);
@@ -306,6 +306,10 @@ void testParams() {
     CHECK(r.params->text_to_value(r.plugin, 2, "-7", &v) && v == -7.0);
     CHECK(r.params->text_to_value(r.plugin, 0, "500", &v) && v == 96.0);   // clamped
     CHECK(!r.params->text_to_value(r.plugin, 0, "lots", &v));
+    CHECK(r.params->value_to_text(r.plugin, 3, 1.0, text, sizeof(text)) && std::strcmp(text, "On") == 0);
+    CHECK(r.params->value_to_text(r.plugin, 3, 0.0, text, sizeof(text)) && std::strcmp(text, "Off") == 0);
+    CHECK(r.params->text_to_value(r.plugin, 3, "On", &v) && v == 1.0);
+    CHECK(r.params->text_to_value(r.plugin, 3, "0", &v) && v == 0.0);
 
     // flush (no processing): changes the value and the transpose.
     Input flushIn;
@@ -478,6 +482,55 @@ struct Source {
     }
 };
 
+// Dry: the originals out too, in every dialect; the copy first, CLAP's with note_id -1.
+void testDry() {
+    Instance r;
+    if (!r.ok()) return;
+    Input in;
+    in.param(0, 1, 1);                    // +1 octave
+    in.param(0, 3, 1);                    // Dry on
+    in.midi1(10, 0x90, 60, 100);
+    in.midi1(20, 0x80, 60, 0);
+    in.note(CLAP_EVENT_NOTE_ON, 30, 7, 0, 62);
+    in.expression(40, CLAP_NOTE_EXPRESSION_VOLUME, 7, 0, 62, 0.5);
+    in.note(CLAP_EVENT_NOTE_OFF, 50, 7, 0, 62);
+    const auto out = r.process(in);
+    CHECK(out.size() == 10);
+    if (out.size() == 10) {
+        CHECK(isMidi1(out[0], 10, 0x90, 60, 100) && isMidi1(out[1], 10, 0x90, 72, 100));
+        CHECK(isMidi1(out[2], 20, 0x80, 60, 0) && isMidi1(out[3], 20, 0x80, 72, 0));
+        CHECK(isNote(out[4], CLAP_EVENT_NOTE_ON, 30, -1, 0, 62) && isNote(out[5], CLAP_EVENT_NOTE_ON, 30, 7, 0, 74));
+        CHECK(isExpression(out[6], 40, CLAP_NOTE_EXPRESSION_VOLUME, -1, 0, 62, 0.5));
+        CHECK(isExpression(out[7], 40, CLAP_NOTE_EXPRESSION_VOLUME, 7, 0, 74, 0.5));
+        CHECK(isNote(out[8], CLAP_EVENT_NOTE_OFF, 50, -1, 0, 62) && isNote(out[9], CLAP_EVENT_NOTE_OFF, 50, 7, 0, 74));
+    }
+
+    // A CLAP note whose shift rounds to its own key: only the shifted one (and its tuning).
+    Input near;
+    near.param(0, 0, 48);
+    near.param(0, 1, 0);
+    near.param(0, 2, 1);                  // +1/4 semitone
+    near.note(CLAP_EVENT_NOTE_ON, 0, 9, 0, 60);
+    near.note(CLAP_EVENT_NOTE_OFF, 10, 9, 0, 60);
+    const auto nearOut = r.process(near);
+    CHECK(nearOut.size() == 3 && isNote(nearOut[0], CLAP_EVENT_NOTE_ON, 0, 9, 0, 60) &&
+          isNote(nearOut[2], CLAP_EVENT_NOTE_OFF, 10, 9, 0, 60));
+
+    // Started dry, ended dry, with Dry turned off in between.
+    Input on;
+    on.param(0, 0, 12);
+    on.param(0, 1, 1);
+    on.param(0, 2, 0);
+    on.note(CLAP_EVENT_NOTE_ON, 0, 11, 0, 64);
+    CHECK(r.process(on).size() == 2);
+    Input off;
+    off.param(0, 3, 0);
+    off.note(CLAP_EVENT_NOTE_OFF, 10, 11, -1, -1);        // by note_id only
+    const auto offOut = r.process(off);
+    CHECK(offOut.size() == 2 && isNote(offOut[0], CLAP_EVENT_NOTE_OFF, 10, -1, 0, 64) &&
+          isNote(offOut[1], CLAP_EVENT_NOTE_OFF, 10, 11, 0, 76));
+}
+
 void testState() {
     Sink sink;
     {
@@ -491,7 +544,7 @@ void testState() {
         const clap_ostream_t os = {&sink, Sink::write};
         CHECK(r.state->save(r.plugin, &os));
     }
-    CHECK(sink.bytes == "Retune 1\ndivisions 19\noctaves -2\nsteps 5\n");
+    CHECK(sink.bytes == "Retune 1\ndivisions 19\noctaves -2\nsteps 5\ndry 0\n");
 
     Instance r;
     if (!r.ok()) return;
@@ -535,6 +588,7 @@ int main(int argc, char** argv) {
     testOutOfRangeAndReset();
     testClapNotes();
     testClapNotesLatch();
+    testDry();
     testState();
     gEntry->deinit();
     if (failures != 0) {

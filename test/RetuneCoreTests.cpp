@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <initializer_list>
+#include <utility>
 #include <vector>
 
 #include "RetuneCore.h"
@@ -42,9 +44,20 @@ bool is(const std::vector<uw::MidiMessage>& v, std::uint32_t w0, std::uint32_t w
     return v.size() == 1 && v[0].words[0] == w0 && v[0].words[1] == w1;
 }
 
-RetuneCore make(int divisions, int octaves, int steps) {
+// The messages, in order, as (word 0, word 1) pairs.
+bool are(const std::vector<uw::MidiMessage>& v, std::initializer_list<std::pair<std::uint32_t, std::uint32_t>> want) {
+    if (v.size() != want.size()) return false;
+    std::size_t i = 0;
+    for (const auto& [w0, w1] : want) {
+        if (v[i].words[0] != w0 || v[i].words[1] != w1) return false;
+        ++i;
+    }
+    return true;
+}
+
+RetuneCore make(int divisions, int octaves, int steps, bool dry = false) {
     RetuneCore core;
-    core.setParams({divisions, octaves, steps});
+    core.setParams({divisions, octaves, steps, dry});
     return core;
 }
 
@@ -275,6 +288,57 @@ void testAllNotesOffAndReset() {
     CHECK(is(run(m2, 0x40803C00, 0), 0x40803500, 0));
 }
 
+// --- Dry ----------------------------------------------------------------------------------
+
+void testDry() {
+    // The original first, then the shifted note; the Note Off likewise.
+    RetuneCore core = make(12, 1, 0, true);
+    CHECK(are(run(core, 0x20903C64), {{0x20903C64, 0}, {0x20904864, 0}}));
+    CHECK(are(run(core, 0x20A03C40), {{0x20A03C40, 0}, {0x20A04840, 0}}));   // poly pressure: both
+    CHECK(are(run(core, 0x20803C40), {{0x20803C40, 0}, {0x20804840, 0}}));
+    CHECK(is(run(core, 0x20B07B00), 0x20B07B00));          // a channel message: once
+
+    // MIDI 2.0: the original keeps its own attribute (none here); the shifted one gets Pitch 7.9.
+    RetuneCore m2 = make(36, 0, 20, true);                  // +6.667: key 66
+    CHECK(are(run(m2, 0x40903C00, 0x8000'0000),
+              {{0x40903C00, 0x8000'0000}, {0x40904203, 0x8000'0000u + (60u << 9) + 3413}}));
+    CHECK(are(run(m2, 0x40003C01, 0x1234'5678),            // a per-note controller: both
+              {{0x40003C01, 0x1234'5678}, {0x40004201, 0x1234'5678}}));
+    CHECK(are(run(m2, 0x40803C00, 0), {{0x40803C00, 0}, {0x40804200, 0}}));
+
+    // The shifted note on its own key: only it plays, and only its Note Off goes.
+    RetuneCore near = make(48, 0, 1, true);                 // +1/4 semitone
+    CHECK(is(run(near, 0x20903C64), 0x20903C64));          // MIDI 1.0 rounds it to the same key
+    CHECK(is(run(near, 0x20803C40), 0x20803C40));
+    CHECK(is(run(near, 0x40903C00, 0x8000'0000), 0x40903C03, 0x8000'0000u + (60u << 9) + 128));
+    CHECK(is(run(near, 0x40803C00, 0), 0x40803C00, 0));
+
+    // Latched: a dry note ends dry whatever Dry is by then, and one started without it doesn't.
+    RetuneCore held = make(12, 0, 7, true);
+    CHECK(run(held, 0x20903C64).size() == 2);
+    held.setParams({12, 0, 7, false});
+    CHECK(are(run(held, 0x20803C40), {{0x20803C40, 0}, {0x20804340, 0}}));
+    CHECK(is(run(held, 0x20903E64), 0x20904564));          // Dry off: the shifted note alone
+    held.setParams({12, 0, 7, true});
+    CHECK(is(run(held, 0x20803E40), 0x20804540));
+
+    // All Notes Off forgets the channel's dry notes; reset forgets them all.
+    RetuneCore cleared = make(12, 0, 7, true);
+    CHECK(run(cleared, 0x20903C64).size() == 2);
+    CHECK(is(run(cleared, 0x20B07B00), 0x20B07B00));
+    CHECK(is(run(cleared, 0x20803C40), 0x20804340));
+    CHECK(run(cleared, 0x20903C64).size() == 2);
+    cleared.reset();
+    CHECK(is(run(cleared, 0x20803C40), 0x20804340));
+
+    // A dry note retriggered while its own key is taken: it ends, before the shifted notes move.
+    RetuneCore retrig = make(12, 0, 7, true);
+    CHECK(run(retrig, 0x20903C64).size() == 2);
+    retrig.setParams({12, 0, 0, true});
+    const auto out = run(retrig, 0x20903C64);
+    CHECK(out.size() == 3 && out[0].words[0] == 0x20803C00 && out[2].words[0] == 0x20903C64);
+}
+
 } // namespace
 
 int main() {
@@ -289,6 +353,7 @@ int main() {
     testOutOfRange();
     testPassThrough();
     testAllNotesOffAndReset();
+    testDry();
     if (failures != 0) {
         std::fprintf(stderr, "RetuneCore: %d check(s) failed\n", failures);
         return 1;

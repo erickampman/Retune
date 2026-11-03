@@ -1,9 +1,9 @@
 #pragma once
 
 // RetuneCore: the note-transposing part of Retune, with no CLAP in it. One UMP message in, zero
-// to two out. The UMP itself and the latch table come from uw-core's uw::ump (NoteRemap, the same
+// to kMaxOut out. The UMP itself and the latch table come from uw-core's uw::ump (NoteRemap, the same
 // shift for every key); this file holds only Retune's own rules: the parameters and the shift
-// (docs/design.md, "Behaviour").
+// (docs/design.md, "Behaviour"), and Dry: the original notes out as well as the shifted ones.
 
 #include <cstddef>
 #include <cstdint>
@@ -22,6 +22,7 @@ struct Params {
     int divisions = 12;   // N: equal steps per octave
     int octaves   = 0;
     int steps     = 0;    // steps of 1/N octave; clamped to ±N when used
+    bool dry      = false;   // the original notes out too
 };
 
 // Params with every field clamped to its range (Steps to ±N, after N is clamped).
@@ -35,9 +36,10 @@ int shift79(const Params& p) noexcept;
 // to nearest, halves away from zero.
 int shiftSemitones(const Params& p) noexcept;
 
-// Most messages one process() call can write: a retriggered note whose output key moved
-// writes a Note Off for the old key before the new Note On.
-inline constexpr std::size_t kMaxOut = uw::ump::NoteRemap::kMaxOut;
+// Most messages one process() call can write: NoteRemap's (a retriggered note whose output key
+// moved writes a Note Off for the old key before the new Note On), and with Dry a retriggered dry
+// note's Note Off and its new Note On.
+inline constexpr std::size_t kMaxOut = uw::ump::NoteRemap::kMaxOut + 2;
 
 class RetuneCore {
 public:
@@ -53,17 +55,23 @@ public:
     // moves by the Note On's full shift, fraction included. A note whose result
     // leaves 0..127 is dropped, with everything that follows it. All Sound Off (CC 120) and All
     // Notes Off (CC 123) clear that channel's latches; everything else passes through
-    // unchanged. Writes at most kMaxOut messages to `out`; returns the count.
-    std::size_t process(const uw::MidiMessage& in, uw::MidiMessage* out) noexcept {
-        return remap_.process(in, out);
-    }
+    // unchanged.
+    //
+    // With Dry, a Note On goes out unchanged as well, before the shifted one, unless the shifted
+    // note lands on its own key (a channel can't hold two notes on one key): then only the shifted
+    // one plays. A dry note is latched too, so its Note Off, poly pressure and MIDI 2.0 per-note
+    // messages go out unchanged while it sounds, whatever Dry is by then.
+    //
+    // Writes at most kMaxOut messages to `out`; returns the count.
+    std::size_t process(const uw::MidiMessage& in, uw::MidiMessage* out) noexcept;
 
     // Forget every sounding note (host reset).
-    void reset() noexcept { remap_.reset(); }
+    void reset() noexcept;
 
 private:
     Params             params_;
     uw::ump::NoteRemap remap_;
+    bool               drySounding_[16][16][128] = {};   // [group][channel][key]
 };
 
 } // namespace retune

@@ -54,6 +54,8 @@
 - [ ] Wrapper patches to keep the fraction (AU MIDI 2.0 event lists, VST3 `noteOn.tuning`)
 - [x] GUI: Divisions, Octaves, Steps, resulting cents; all three as rings of one dial (2026-11-03, design.md "Editor")
 - [ ] Editor seen in StageHand, Bitwig and an AU host, and on Linux
+- [x] Dry: the original notes out too, in every dialect, latched; a checkbox in the editor (2026-11-03)
+- [ ] Dry: a dry note and another key's shifted note on one key (uw-core's NoteRemap owner table)
 
 ## Outside Retune (StageHand)
 - [x] `outEventsTryPush` keeps plugin note output (MIDI 1.0 and 2.0 as UMP)

@@ -2,7 +2,8 @@
 //
 // NoteGran's shell, cut down to one plugin: the header (the Unlikelyware logo and "Retune" in its
 // accent) and one view, the dial (Views.hpp's ShiftDial): Divisions as an arc outside, Steps the
-// ring inside it, Octaves the ring inside that, each dragged round by its handle. Steps turns
+// ring inside it, Octaves the ring inside that, each dragged round by its handle; Dry a checkbox in
+// the header. Steps turns
 // through ±N, the range Retune uses, and shows the clamped value when a lower N has cut the stored
 // one (docs/design.md: the stored value is never rewritten).
 //
@@ -25,6 +26,7 @@
 #include "EmbeddedResources.hpp"   // build-time: the logo's bytes
 #include "Logo.hpp"
 #include "RetuneCore.h"
+#include "Toggle.hpp"
 #include "Views.hpp"
 #include "plugin_gui.h"
 
@@ -33,6 +35,7 @@ START_NAMESPACE_DISTRHO
 using DGL_NAMESPACE::Color;
 using DGL_NAMESPACE::Logo;
 using DGL_NAMESPACE::ShiftDial;
+using DGL_NAMESPACE::Toggle;
 
 namespace {
 
@@ -49,7 +52,7 @@ constexpr int kWidth = 520, kHeight = 560;
 
 // --- the editor --------------------------------------------------------------------------------
 
-class RetuneUI : public UI, public ShiftDial::Callback {
+class RetuneUI : public UI, public ShiftDial::Callback, public Toggle::Callback {
 public:
     RetuneUI() : UI(kWidth, kHeight) {
         fPlugin = static_cast<const clap_plugin_t*>(getPluginInstancePointer());
@@ -60,6 +63,11 @@ public:
                                        EmbeddedResources::Unlikelyware_Final_ColorDataSize);
         fDial = std::make_unique<ShiftDial>(this, this);
         fDial->setAccent(kAccent);
+        fDry = std::make_unique<Toggle>(this, this);
+        fDry->setId(RT_PARAM_DRY);
+        fDry->setLabel("Dry: the originals too");
+        fDry->setLabelBeside(true);
+        fDry->setAccentColor(kAccent);
 
         refresh(true);
         layout();
@@ -84,6 +92,13 @@ protected:
     void dialDragFinished(int ring) override {
         editParameter(static_cast<uint32_t>(ring), false);
         fDragging[ring] = false;
+    }
+
+    void toggleChanged(Toggle*, bool on) override {
+        editParameter(RT_PARAM_DRY, true);
+        setParameterValue(RT_PARAM_DRY, on ? 1.0f : 0.0f);
+        editParameter(RT_PARAM_DRY, false);
+        fShown[RT_PARAM_DRY] = on ? 1.0f : 0.0f;
     }
 
     // The timer: the values.
@@ -121,7 +136,8 @@ private:
 
     void show(uint32_t id, float v) {
         fShown[id] = v;
-        updateDial();
+        if (id == RT_PARAM_DRY) fDry->setState(v >= 0.5f);
+        else updateDial();
     }
 
     // Every value from the plugin; what changed (or everything) is shown. A ring being dragged keeps
@@ -150,6 +166,12 @@ private:
         fLogo->setAbsolutePos(M, static_cast<int>(11 * s));
         fTitleX = static_cast<float>(M + static_cast<int>(fLogo->getWidth()) + static_cast<int>(12 * s));
 
+        // Dry at the header's right.
+        const int dryW = static_cast<int>(170 * s);
+        fDry->setUiScale(s);
+        fDry->setAbsolutePos(W - M - dryW, static_cast<int>(10 * s));
+        fDry->setSize(static_cast<uint>(dryW), static_cast<uint>(24 * s));
+
         fDial->setUiScale(s);
         fDial->setAbsolutePos(M, hdr);
         fDial->setSize(static_cast<uint>(W - 2 * M), static_cast<uint>(H - hdr - M));
@@ -159,6 +181,7 @@ private:
     float                      fShown[RT_PARAM_COUNT]    = {};
     bool                       fDragging[RT_PARAM_COUNT] = {};
     std::unique_ptr<ShiftDial> fDial;
+    std::unique_ptr<Toggle>    fDry;
     std::unique_ptr<Logo>      fLogo;
     bool                       fHasFont           = false;
     bool                       fInitialSizeNudged = false;

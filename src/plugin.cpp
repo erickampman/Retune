@@ -59,7 +59,10 @@ constexpr ParamSpec kParams[] = {
     {"Octaves", "octaves", -retune::kMaxOctaves, retune::kMaxOctaves, 0},
     // The host sees ±(max N); RetuneCore clamps Steps to ±N when it uses it (docs/design.md).
     {"Steps", "steps", -retune::kMaxDivisions, retune::kMaxDivisions, 0},
+    // Off 0, On 1: the original notes out as well as the shifted ones (RetuneCore.h, ClapDry below).
+    {"Dry", "dry", 0, 1, 0},
 };
+constexpr uint32_t kDry = 3;
 constexpr uint32_t kParamCount = sizeof(kParams) / sizeof(kParams[0]);
 
 double clampParam(uint32_t index, double value) {
@@ -142,6 +145,92 @@ private:
 };
 
 // ---------------------------------------------------------------------------------------------
+// Dry for CLAP note events (RetuneCore does it for MIDI)
+// ---------------------------------------------------------------------------------------------
+
+// The original CLAP notes out as well as the shifted ones, by RetuneCore's rule: a Note On is sent
+// unchanged too, unless the shifted note lands on its own key; a dry note is latched (by channel
+// and key, with the host's note_id), so its Note Off, choke and expressions go out unchanged while
+// it sounds. The copies carry note_id -1, leaving the host's id to the shifted note: a synth then
+// tells them apart by key. A wildcard event (key and note_id both -1) reaches the dry notes as it
+// is, so it isn't copied.
+class ClapDry {
+public:
+    // Before ClapNoteRemap sees the event. `keyShift`: the shifted note's distance from its key,
+    // in whole keys (as ClapNoteRemap rounds it).
+    void process(const clap_event_header_t* h, bool dry, int keyShift, const clap_output_events_t* out) {
+        if (h->type == CLAP_EVENT_NOTE_EXPRESSION) {
+            const auto* ev = reinterpret_cast<const clap_event_note_expression_t*>(h);
+            if (ev->key < 0 && ev->note_id < 0) return;
+            forEach(ev->channel, ev->key, ev->note_id, [&](int channel, int key) {
+                clap_event_note_expression_t copy = *ev;
+                copy.note_id = -1;
+                copy.channel = int16_t(channel);
+                copy.key     = int16_t(key);
+                out->try_push(out, &copy.header);
+            });
+            return;
+        }
+        const auto* ev = reinterpret_cast<const clap_event_note_t*>(h);
+        if (h->type == CLAP_EVENT_NOTE_ON) {
+            if (ev->channel < 0 || ev->channel > 15 || ev->key < 0 || ev->key > 127) return;
+            Note&      n    = notes_[ev->channel][ev->key];
+            const bool send = dry && keyShift != 0;   // on its own key, only the shifted note plays
+            if (n.sounding && !send) pushCopy(*ev, CLAP_EVENT_NOTE_OFF, ev->channel, ev->key, out);
+            if (send) pushCopy(*ev, CLAP_EVENT_NOTE_ON, ev->channel, ev->key, out);
+            n = {send, ev->note_id};
+            return;
+        }
+        // Note Off or choke.
+        const bool wildcard = ev->key < 0 && ev->note_id < 0;
+        forEach(ev->channel, ev->key, ev->note_id, [&](int channel, int key) {
+            if (!wildcard) pushCopy(*ev, h->type, channel, key, out);
+            notes_[channel][key].sounding = false;
+        });
+    }
+
+    // All Sound Off or All Notes Off on a channel (as MIDI), and host reset.
+    void endChannel(int channel) {
+        for (Note& n : notes_[channel]) n.sounding = false;
+    }
+    void reset() {
+        for (int c = 0; c < 16; ++c) endChannel(c);
+    }
+
+private:
+    struct Note {
+        bool    sounding = false;
+        int32_t noteId   = -1;
+    };
+
+    // Each sounding dry note the address names: by note_id when the event has one, else by
+    // channel and key, -1 matching any.
+    template <typename F>
+    void forEach(int channel, int key, int32_t noteId, F&& f) {
+        for (int c = 0; c < 16; ++c) {
+            if (channel >= 0 && channel != c) continue;
+            for (int k = 0; k < 128; ++k) {
+                const Note& n = notes_[c][k];
+                if (!n.sounding) continue;
+                if (noteId >= 0 ? n.noteId == noteId : (key < 0 || key == k)) f(c, k);
+            }
+        }
+    }
+
+    static void pushCopy(const clap_event_note_t& ev, uint16_t type, int channel, int key,
+                         const clap_output_events_t* out) {
+        clap_event_note_t copy = ev;
+        copy.header.type = type;
+        copy.note_id     = -1;
+        copy.channel     = int16_t(channel);
+        copy.key         = int16_t(key);
+        out->try_push(out, &copy.header);
+    }
+
+    Note notes_[16][128];   // [channel][key]
+};
+
+// ---------------------------------------------------------------------------------------------
 // The plugin
 // ---------------------------------------------------------------------------------------------
 
@@ -155,6 +244,7 @@ struct Plugin {
 
     retune::RetuneCore core;        // MIDI 1.0 and 2.0; audio thread while active, main thread otherwise
     uw::ClapNoteRemap  clapNotes;   // CLAP note events; likewise
+    ClapDry            clapDry;     // and their originals, with Dry; likewise
     std::string        scratch;
     bool               wrapped = false;   // hosted by clap-wrapper (AUv2, VST3)
 
@@ -174,7 +264,8 @@ Plugin* self(const clap_plugin_t* plugin) { return static_cast<Plugin*>(plugin->
 retune::Params currentParams(const Plugin* p) {
     return {int(p->values[0].load(std::memory_order_relaxed)),
             int(p->values[1].load(std::memory_order_relaxed)),
-            int(p->values[2].load(std::memory_order_relaxed))};
+            int(p->values[2].load(std::memory_order_relaxed)),
+            p->values[kDry].load(std::memory_order_relaxed) >= 0.5};
 }
 
 void applyParams(Plugin* p) {
@@ -335,6 +426,9 @@ void handleEvent(Plugin* p, const clap_event_header_t* h, const clap_output_even
                 m.words[0]  = 0x2000'0000u | (uint32_t(ev->data[0]) << 16) |
                               (uint32_t(ev->data[1] & 0x7F) << 8) | uint32_t(ev->data[2] & 0x7F);
                 m.wordCount = 1;
+                // All Sound Off / All Notes Off end the channel's dry CLAP notes too.
+                if ((ev->data[0] & 0xF0) == 0xB0 && (ev->data[1] == 120 || ev->data[1] == 123))
+                    p->clapDry.endChannel(ev->data[0] & 0x0F);
                 transposeAndPush(p, h, ev->port_index, m, true, out);
             } else {
                 push(out, h);   // system messages pass through as they are
@@ -346,6 +440,8 @@ void handleEvent(Plugin* p, const clap_event_header_t* h, const clap_output_even
         case CLAP_EVENT_NOTE_OFF:
         case CLAP_EVENT_NOTE_CHOKE:
         case CLAP_EVENT_NOTE_EXPRESSION:
+            if (out != nullptr && out->try_push != nullptr)
+                p->clapDry.process(h, p->core.params().dry, retune::shiftSemitones(p->core.params()), out);
             p->clapNotes.process(h, out);
             break;
 
@@ -389,6 +485,7 @@ bool plug_activate(const clap_plugin_t* plugin, double, uint32_t, uint32_t) {
     Plugin* p = self(plugin);
     p->core.reset();
     p->clapNotes.reset();
+    p->clapDry.reset();
     applyParams(p);
     p->valuesChangedByState.store(false, std::memory_order_relaxed);
     return true;
@@ -408,6 +505,7 @@ void plug_stop_processing(const clap_plugin_t*) {}
 void plug_reset(const clap_plugin_t* plugin) {
     self(plugin)->core.reset();
     self(plugin)->clapNotes.reset();
+    self(plugin)->clapDry.reset();
 }
 
 clap_process_status plug_process(const clap_plugin_t* plugin, const clap_process_t* process) {
@@ -477,12 +575,17 @@ bool params_get_value(const clap_plugin_t* plugin, clap_id id, double* out) {
 
 bool params_value_to_text(const clap_plugin_t*, clap_id id, double value, char* out, uint32_t size) {
     if (id >= kParamCount) return false;
-    std::snprintf(out, size, "%d", int(clampParam(id, value)));
+    if (id == kDry) std::snprintf(out, size, "%s", clampParam(id, value) > 0 ? "On" : "Off");
+    else std::snprintf(out, size, "%d", int(clampParam(id, value)));
     return true;
 }
 
 bool params_text_to_value(const clap_plugin_t*, clap_id id, const char* text, double* out) {
     if (id >= kParamCount) return false;
+    if (id == kDry && (std::strcmp(text, "On") == 0 || std::strcmp(text, "Off") == 0)) {
+        *out = text[1] == 'n' ? 1.0 : 0.0;
+        return true;
+    }
     char* end = nullptr;
     const double value = std::strtod(text, &end);
     if (end == text) return false;
