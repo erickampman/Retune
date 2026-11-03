@@ -81,8 +81,12 @@ Retune/
   external/clap          submodule
   external/uw-core       submodule, UMP-only build (UW_CORE_UMP_ONLY): uw::ump
   external/clap-wrapper  submodule (phase 3)
+  external/dpf           submodule, NoteGran's pin: the editor's drawing (DGL, NanoVG, pugl)
   src/RetuneCore.{h,cpp} pure C++, no CLAP: shift maths, latch table, over uw::MidiMessage
-  src/plugin.cpp         clap_entry, note ports (in + out), params, state
+  src/plugin.cpp         clap_entry, note ports (in + out), params, state, what's held for the editor
+  src/plugin_gui.h       the seam between the plugin and its editor
+  src/UI/                the editor: RetuneUI.cpp, Views.hpp and the house widget kit
+  resources/             the logo, embedded at build time
   test/                  core unit tests + a headless host test that dlopens the .clap
 ```
 
@@ -127,7 +131,41 @@ latch table) stays here.
    - VST3: set `noteOn.tuning` from a CLAP tuning note expression or a 7.9 pitch.
    These go in our vendored copy, and possibly upstream.
 5. **GUI** (DPF/NanoVG, as in the synths). Three controls: Divisions, Octaves, Steps (plus a read-out of
-   the resulting cents). Ask before anything UI-visible.
+   the resulting cents). Built (2026-11-03): "Editor", below.
+
+## Editor (2026-11-03)
+
+Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut down to one plugin:
+
+- **DPF for drawing only, as NoteGran:** DGL, NanoVG and pugl (`external/dpf`, NoteGran's pin), the
+  window built by hand with `UIExporter`; the CLAP entry point stays ours. The plugin and the editor
+  meet only at `src/plugin_gui.h` (`rt_*`). macOS and Linux (X11), embedded windows only. The editor
+  is in every format: the .clap and the clap-wrapper VST3 and AUv2.
+- **The house widget kit,** copied from NoteGran's `src/UI` (Knob, GroupBox, Logo), and NoteGran's
+  charcoal family with Retune's own accent, a leaf green.
+- **760 × 480,** resizable at that ratio from 0.8×. The header (logo, "Retune"); down the left the
+  shift circle; on the right the Shift group (Divisions, Octaves, Steps) over the held-notes view.
+- **Shift circle:** the octave as N steps, 0 at the top, 12-TET's semitones ticked outside it; an
+  arc from 0 to where Steps lands (clockwise up), the whole shift in cents in the middle, then the
+  shift in words and what MIDI 1.0 rounds it to ("+14 semitones, 10.5¢ sharp"). The dot drags round
+  the ring, carrying on past the bottom up to ±N rather than flipping sign; a step clicked sets Steps
+  the nearer way round. A press, drag and release is one gesture.
+- **Steps** turns through ±N, the range Retune uses, and shows the clamped value when a lower N has
+  cut the stored one (the stored value is still never rewritten, as above).
+- **Held view:** a keyboard of equal semitones; each note held at the input above it, each note
+  sounding at the output lit at its exact pitch (MIDI 2.0's Pitch 7.9, or a CLAP tuning expression),
+  the two joined while they pair one to one, and up to six outputs named with their cents.
+  process() tracks both sides from the events themselves (the output through a watching wrapper on
+  the host's output list) and publishes them under a sequence count when they change; the core's
+  latches are untouched.
+- **Values are polled** on the editor's 60 Hz timer, as NoteGran's; its edits go through a ring,
+  applied (and sent to the host as gestures and values) at the next process() or flush. The timer
+  starts at `set_parent` as well as `show`, so clap-wrapper's AUv2 view, which never calls `show`,
+  draws without the synths' patch.
+- **Checked** (2026-11-03) in a scratch Cocoa host that loads the .clap, holds MIDI 2.0 notes and
+  reads the GL view back: draws at 2×, 19-, 31-, 12- and 5-EDO shifts read right, a clamped Steps
+  shows clamped, and a click on the circle reaches the host as a gesture. auval passes. Not yet
+  seen in a DAW or StageHand, nor on Linux.
 
 ## StageHand: the main host
 

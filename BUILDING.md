@@ -1,7 +1,7 @@
 # Building Retune
 
 Retune builds the same way on Linux and macOS: CMake + Ninja, git submodules, C++20.
-The build makes the core library `retune_core`, the plugin `Retune.clap`, and two test programs:
+The build makes the core library `retune_core`, the plugin `Retune.clap` (with its editor), and two test programs:
 `retune-core-tests` (the core) and `retune-clap-tests` (a headless host that loads the built `.clap`).
 It also wraps the same plugin with clap-wrapper: `Retune.vst3` (Linux and macOS) and
 `Retune.component`, an AUv2 MIDI effect (macOS only).
@@ -31,8 +31,12 @@ sudo apt install build-essential cmake ninja-build pkg-config python3 git \
 It's one list for every Unlikelyware project (the same one CI installs), so it covers more than
 Retune needs. On other distros, install the same libraries under their own names.
 
-Retune itself needs none of those libraries: it builds uw-core with `UW_CORE_UMP_ONLY`, which makes
-only `uw::ump` (no JACK, ALSA, CoreAudio or CoreMIDI).
+Of those libraries Retune uses only the X11 and OpenGL ones, for the editor. It builds uw-core with
+`UW_CORE_UMP_ONLY`, which makes only `uw::ump` (no JACK, ALSA, CoreAudio or CoreMIDI). The editor
+uses DPF (`external/dpf`) for drawing only: DGL, NanoVG and pugl, as NoteGran and StruckSynth do.
+DPF is the author's fork (`erickampman/DPF`, which pins the pugl fork `erickampman/pugl`), as every
+DPF user's is; while the repos are private, cloning needs access to both. Python 3 embeds the logo
+at build time.
 
 ## Get the source
 
@@ -42,8 +46,8 @@ cd Retune
 tools/fetch_deps.sh
 ```
 
-`tools/fetch_deps.sh` checks out the git submodules at their pinned commits. Run it again after a
-`git pull` that moves, adds or re-points a submodule: a plain pull leaves them where they were.
+`tools/fetch_deps.sh` checks out the git submodules at their pinned commits, with DPF's own pugl
+submodule. Run it again after a `git pull` that moves, adds or re-points a submodule: a plain pull leaves them where they were.
 
 Of the VST® 3 SDK's nested submodules it takes only the four the build uses; `--recursive` would also
 download VSTGUI, the SDK tutorials and its docs. If the folders under `external/` are empty, CMake
@@ -163,7 +167,9 @@ commands under "Build and test", and for a plugin `cmake --build build --target 
 same package list, the same `build/` folder, the same option names (`<PROJECT>_BUILD_VST3`,
 `<PROJECT>_UW_CORE_DIR` and so on). What's different here, and why:
 
-- No UI and no DPF: Retune is a note effect with only parameters, so it has no `dpf` submodule and needs no `patches/` (the synths' clap-wrapper patch is for its AUv2 view).
+- No `patches/`: the synths patch clap-wrapper's AUv2 view to call the plugin's `gui->show()`, which
+  starts their render timer. Retune's editor starts its timer at `set_parent` as well (as NoteGran's
+  does), so the unpatched AUv2 view draws.
 - The VST3 and AUv2 builds keep only the MIDI 1.0 (rounded) behaviour (above).
 - No `_WERROR` option: the seven synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
 - No CI yet (ReleaseUMP R1-3, from November 2026).

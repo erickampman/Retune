@@ -52,7 +52,8 @@
 
 ## M5: Later
 - [ ] Wrapper patches to keep the fraction (AU MIDI 2.0 event lists, VST3 `noteOn.tuning`)
-- [ ] GUI: Divisions, Octaves, Steps, resulting cents
+- [x] GUI: Divisions, Octaves, Steps, resulting cents; the shift on a circle of N steps, the notes held in and out (2026-11-03, design.md "Editor")
+- [ ] Editor seen in StageHand, Bitwig and an AU host, and on Linux
 
 ## Outside Retune (StageHand)
 - [x] `outEventsTryPush` keeps plugin note output (MIDI 1.0 and 2.0 as UMP)
