@@ -42,6 +42,8 @@ source only.
 The editor is one dial: Divisions as an arc round the outside, Steps the ring inside it and
 Octaves the ring inside that. Drag a handle round its ring, or scroll over it; double-click to put
 it back. The middle shows the shift in cents, and below it how far MIDI 1.0's rounding is from it.
+The **?** in the editor's header opens the full help page ([resources/help.md](resources/help.md))
+in your browser.
 
 The shift is `12 × Octaves + 12 × Steps / N` semitones. Lowering Divisions clamps Steps to the
 new range. Notes shifted out of MIDI's 0–127 range are dropped. Everything that isn't a note

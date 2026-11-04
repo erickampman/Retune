@@ -3,7 +3,7 @@
 // NoteGran's shell, cut down to one plugin: the header (the Unlikelyware logo and "Retune" in its
 // accent) and one view, the dial (Views.hpp's ShiftDial): Divisions as an arc outside, Steps the
 // ring inside it, Octaves the ring inside that, each dragged round by its handle; Dry a checkbox in
-// the header. Steps turns
+// the header, beside Help (a "?" box that opens the help page in the browser). Steps turns
 // through ±N, the range Retune uses, and shows the clamped value when a lower N has cut the stored
 // one (docs/design.md: the stored value is never rewritten).
 //
@@ -22,8 +22,10 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <vector>
 
-#include "EmbeddedResources.hpp"   // build-time: the logo's bytes
+#include "EmbeddedResources.hpp"   // build-time: the logo's and the help page's bytes
+#include "HelpButton.hpp"
 #include "Logo.hpp"
 #include "RetuneCore.h"
 #include "Toggle.hpp"
@@ -33,6 +35,7 @@
 START_NAMESPACE_DISTRHO
 
 using DGL_NAMESPACE::Color;
+using DGL_NAMESPACE::HelpButton;
 using DGL_NAMESPACE::Logo;
 using DGL_NAMESPACE::ShiftDial;
 using DGL_NAMESPACE::Toggle;
@@ -63,6 +66,11 @@ public:
                                        EmbeddedResources::Unlikelyware_Final_ColorDataSize);
         fDial = std::make_unique<ShiftDial>(this, this);
         fDial->setAccent(kAccent);
+        // help.html shows the logo as "Unlikelyware.png", so it is written out under that name.
+        fHelp = std::make_unique<HelpButton>(this, std::vector<HelpButton::File>{
+            {"Retune-help.html", EmbeddedResources::helpData, EmbeddedResources::helpDataSize},
+            {"Unlikelyware.png", EmbeddedResources::Unlikelyware_Final_ColorData,
+             EmbeddedResources::Unlikelyware_Final_ColorDataSize}});
         fDry = std::make_unique<Toggle>(this, this);
         fDry->setId(RT_PARAM_DRY);
         fDry->setLabel("Dry: the originals too");
@@ -166,10 +174,13 @@ private:
         fLogo->setAbsolutePos(M, static_cast<int>(11 * s));
         fTitleX = static_cast<float>(M + static_cast<int>(fLogo->getWidth()) + static_cast<int>(12 * s));
 
-        // Dry at the header's right.
-        const int dryW = static_cast<int>(170 * s);
+        // Help at the header's right, Dry beside it.
+        const int helpW = static_cast<int>(26 * s), dryW = static_cast<int>(170 * s);
+        fHelp->setUiScale(s);
+        fHelp->setAbsolutePos(W - M - helpW, static_cast<int>(9 * s));
+        fHelp->setSize(static_cast<uint>(helpW), static_cast<uint>(26 * s));
         fDry->setUiScale(s);
-        fDry->setAbsolutePos(W - M - dryW, static_cast<int>(10 * s));
+        fDry->setAbsolutePos(W - M - helpW - static_cast<int>(16 * s) - dryW, static_cast<int>(10 * s));
         fDry->setSize(static_cast<uint>(dryW), static_cast<uint>(24 * s));
 
         fDial->setUiScale(s);
@@ -182,6 +193,7 @@ private:
     bool                       fDragging[RT_PARAM_COUNT] = {};
     std::unique_ptr<ShiftDial> fDial;
     std::unique_ptr<Toggle>    fDry;
+    std::unique_ptr<HelpButton> fHelp;
     std::unique_ptr<Logo>      fLogo;
     bool                       fHasFont           = false;
     bool                       fInitialSizeNudged = false;

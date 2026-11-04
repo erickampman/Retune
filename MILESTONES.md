@@ -56,6 +56,7 @@
 - [ ] Editor seen in StageHand, Bitwig and an AU host, and on Linux
 - [x] Dry: the original notes out too, in every dialect, latched; a checkbox in the editor (2026-11-03)
 - [ ] Dry: a dry note and another key's shifted note on one key (uw-core's NoteRemap owner table)
+- [x] Help page (resources/help.md → help.html, the shared template) and a Help button in the editor (2026-11-03)
 
 ## Outside Retune (StageHand)
 - [x] `outEventsTryPush` keeps plugin note output (MIDI 1.0 and 2.0 as UMP)

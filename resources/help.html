@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>help-Retune</title>
+    <style>
+:root {
+  --bg: #0f1115;
+  --page: #141823;
+  --text: #e6e2d8;
+  --muted: rgba(230, 226, 216, 0.72);
+  --border: rgba(230, 226, 216, 0.12);
+  --shadow: rgba(0, 0, 0, 0.35);
+
+  /* New: "card" surface (slightly lighter than page) */
+  --card: rgba(255, 255, 255, 0.04);
+  --card-hover: rgba(255, 255, 255, 0.055);
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #fbfaf7;
+}
+
+/* Page container — new */
+.page {
+    max-width: 900px;       /* or whatever you prefer */
+    margin: 0 auto;         /* center it */
+    padding: 2rem;          /* spacing around content */
+}
+
+/* Basic typography */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: #222;
+
+    /* REMOVE padding: now applied by .page */
+    /* padding: 1rem; */
+}
+
+/* Headings */
+h1, h2, h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+/* Paragraph spacing */
+p {
+    margin: 0.75rem 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0.75rem 0 0.75rem 1.5rem;
+}
+
+/* Code blocks */
+pre, code {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+pre {
+    background: #f0f0f0;
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+}
+
+code {
+    background: #ececec;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+/* Don't double-style code inside pre blocks */
+pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+/* Hook for language-specific styles (future syntax highlighting) */
+code[class^="language-"],
+code[class*=" language-"] {
+    /* placeholder: add colors later if you want */
+}
+
+/* Blockquotes */
+blockquote {
+    margin: 1.5rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid #ccc;
+    color: #555;
+    font-style: italic;
+}
+
+/* Horizontal rule */
+hr {
+    border: none;
+    border-top: 1px solid #ccc;
+    margin: 2rem 0;
+}
+
+.module-container {
+  display: flex; 
+  justify-content: center; 
+}
+
+/* Images */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1rem 0;
+    border-radius: 12px;
+}
+
+.disclosure-content {
+  padding: 0.5em 1em;
+}
+
+.disclosure-content > p:first-child {
+  margin-top: 0;
+}
+
+.disclosure-content > p:last-child {
+  margin-bottom: 0;
+}
+
+:target {
+  scroll-margin-top: 1.5rem;
+  outline: 2px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+figure.float-right {
+  float: right;
+  margin: 0 0 1rem 1rem;
+  max-width: 45%;
+}
+
+figure.float-left {
+  float: left;
+  margin: 0 1rem 1rem 0;
+  max-width: 45%;
+}
+
+.clear {
+  clear: both;
+}
+
+figure {
+    display: inline-block;     /* shrink-wrap to image width */
+    margin: 1em 0;
+    text-align: center;        /* center caption under image */
+}
+
+figure img {
+    display: block;            /* prevent inline baseline quirks */
+    max-width: 100%;
+    height: auto;
+}
+
+figcaption {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 0.4em;
+}
+
+a.embed {
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.05);
+  text-decoration: none;
+}
+
+.callout-note {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1em;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* The generic rounded-rect card */
+.card {
+  display: block;                 /* important for headings */
+  padding: 0.9rem 1rem;
+  margin: 1.1rem 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 10px 22px var(--shadow);
+}
+
+/* Only hover cards that are meant to be interactive */
+.card.is-interactive:hover {
+  background: var(--card-hover);
+}
+
+
+/* Make sure headings don’t add their own extra margins inside cards */
+.card h1, .card h2, .card h3,
+h1.card, h2.card, h3.card {
+  margin: 0;
+}
+
+.module-header {
+  position: relative;
+  display: flex;
+  justify-content: center;   /* center the title */
+  align-items: baseline;
+}
+
+.module-back {
+  position: absolute;
+  left: 0;
+  font-size: 0.85em;
+  opacity: 0.6;
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
+
+.module-back:hover {
+  opacity: 1.0;
+}
+
+.module-title {
+  margin: 0;
+  text-align: center;
+}
+
+/* breadcrumb trail */
+.breadcrumb { font-size: 0.85em; opacity: 0.7; letter-spacing: 0.03em; margin-bottom: 0.35rem; }
+.breadcrumb a { text-decoration: none; color: inherit; opacity: 0.75; }
+.breadcrumb a:hover { opacity: 1.0; }
+.breadcrumb .crumb-current { opacity: 1.0; }
+
+
+/* Tables (pipe tables from pandoc) */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 0.95em;
+}
+
+th, td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  border-bottom: 2px solid #bbb;
+  font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.025);
+}    </style>
+</head>
+<body>
+<div class="page">
+<div style="display: flex; align-items: center; gap: 0.75rem; margin: 1.5rem 0 0.5rem;">
+  <a href="https://www.unlikelyware.com" target="_blank" rel="noopener noreferrer">
+    <img src="Unlikelyware.png" alt="Unlikelyware" style="width: 56px; height: auto; border-radius: 10px; margin: 0; display: block;">
+  </a>
+  <h1 style="margin: 0;">Retune</h1>
+</div>
+
+<p>
+  <em>Retune is a CLAP note effect on macOS and Linux. Its VST® 3 and AUv2 (macOS) builds work too, rounded to semitones.</em>
+</p>
+
+<section id="on-this-page" class="callout callout-note card">
+<h2>On This Page</h2>
+<p><a href="#overview">Overview</a> · <a href="#getting-started">Getting
+Started</a> · <a href="#window">The Window</a></p>
+<p><strong>The controls —</strong> <a href="#divisions">Divisions</a> ·
+<a href="#steps">Steps</a> · <a href="#octaves">Octaves</a> · <a
+href="#readouts">The Readouts</a> · <a href="#dry">Dry</a></p>
+<p><strong>Playing —</strong> <a href="#hosts">Hosts and the
+Fraction</a> · <a href="#midi">Held Notes and MIDI</a> · <a
+href="#tips">Tips</a> · <a
+href="#troubleshooting">Troubleshooting</a></p>
+</section>
+<section id="overview" class="callout callout-note card">
+<h2>Overview</h2>
+<p>Retune is a <strong>note effect</strong>: it makes no sound. It sits
+in front of a synth and moves every note you play by the same interval,
+measured in an <strong>equal division of the octave</strong> (EDO).</p>
+<p>You choose <strong>N</strong>, the number of equal steps in an octave
+(5 to 96), and how many of those steps to move (<strong>Steps</strong>),
+plus whole <strong>Octaves</strong>. So a 12-TET keyboard can play
+shifted by 3 steps of 19-EDO, 5 steps of 31-EDO, or a quarter tone of
+24-EDO.</p>
+<p>The shift in semitones is <strong>12 × Octaves + 12 × Steps /
+N</strong>. With N = 12 every shift is a whole number of semitones; with
+any other N it usually has a fraction, and that fraction is what Retune
+is for:</p>
+<ul>
+<li><strong>MIDI 2.0:</strong> the note carries its exact pitch (Pitch
+7.9), so a synth that reads it plays the exact EDO step.</li>
+<li><strong>CLAP notes</strong> (Bitwig and other CLAP hosts): the note
+goes to the nearest key, with a tuning expression carrying the
+fraction.</li>
+<li><strong>MIDI 1.0:</strong> the note goes to the nearest semitone and
+the fraction is lost.</li>
+</ul>
+<p><a href="#hosts">Hosts and the Fraction</a> says which one you
+get.</p>
+</section>
+<section id="getting-started" class="callout callout-note card">
+<h2>Getting Started</h2>
+<ol type="1">
+<li><strong>Put Retune in front of a synth</strong>: in Bitwig, a note
+FX before the instrument; in REAPER, before the instrument in the
+track's FX chain; in StageHand, the row's <strong>MIDI FX</strong> menu;
+in Logic, a <strong>MIDI FX</strong> slot.</li>
+<li><strong>Play.</strong> By default Retune does nothing: 12-EDO, no
+steps, no octaves.</li>
+<li><strong>Drag the Divisions handle</strong> (the outer arc) to the
+EDO you want, say 19.</li>
+<li><strong>Drag the Steps handle</strong> (the middle ring) clockwise
+to shift up, anticlockwise to shift down. The middle of the dial shows
+the shift in cents.</li>
+<li><strong>Drag the Octaves handle</strong> (the inner ring) for whole
+octaves.</li>
+<li><strong>Tick Dry</strong> in the header to hear the original note as
+well.</li>
+</ol>
+<p>The host saves every setting with its project.</p>
+</section>
+<section id="window" class="callout callout-note card">
+<h2>The Window</h2>
+<p><strong>The header:</strong> the Unlikelyware logo (a click opens
+unlikelyware.com), <strong>Retune</strong>, the <strong>Dry</strong>
+checkbox, and <strong>Help</strong> (the <strong>?</strong> box that
+opens this page in your browser).</p>
+<p><strong>The dial:</strong> three controls as rings round one centre,
+each named just inside its top and each with a round handle that shows
+its value:</p>
+<ul>
+<li><strong>Divisions</strong>, the outer arc</li>
+<li><strong>Steps</strong>, the middle ring</li>
+<li><strong>Octaves</strong>, the inner ring</li>
+</ul>
+<p>In the middle, the whole shift in cents and in semitones; at the
+bottom, the shift in words and what MIDI 1.0 makes of it (<a
+href="#readouts">The Readouts</a>).</p>
+<p><strong>Resizing:</strong> drag the host window's corner. The window
+keeps its shape (520 × 560) and scales everything in it; the smallest
+size is 416 × 448.</p>
+</section>
+<details class="disclosure">
+<summary class="disclosure-title subtle">Using the rings</summary>
+
+<div class="disclosure-content">
+<table>
+<thead>
+<tr>
+<th>Gesture</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Drag a handle</td>
+<td>Moves it round its ring</td>
+</tr>
+<tr>
+<td>Press anywhere else on a ring</td>
+<td>Jumps the handle there, then drags from there</td>
+</tr>
+<tr>
+<td>Double-click a ring</td>
+<td>Back to its default: Divisions 12, Steps 0, Octaves 0</td>
+</tr>
+<tr>
+<td>Scroll over a ring</td>
+<td>One step per notch: up or right for more</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Steps</strong> and <strong>Octaves</strong> go all the way
+round: a drag carries on past the bottom instead of flipping from + to
+−, and stops at its end (a whole turn). A press on a ring takes the
+shorter way round from 0. <strong>Divisions</strong> is an arc with a
+gap at the bottom: a drag into the gap stays at the end it went
+past.</p>
+<p>Each drag, and each scroll notch, is one gesture to the host, so it
+records as one automation move.</p>
+</div>
+</details>
+
+<section id="divisions" class="callout callout-note card">
+<h2>Divisions</h2>
+<p><strong>N</strong>, the number of equal steps in an octave: 5 to 96,
+default 12. The arc runs from 5 at the lower left, over the top, to 96
+at the lower right, with the common EDOs marked: 7, 12, 19, 22, 24, 31,
+41, 53 and 72.</p>
+<p>The minimum is 5 because every N below it (1, 2, 3, 4) divides 12:
+its steps are an octave, a tritone, a major third or a minor third, all
+of which 12-EDO already makes.</p>
+</section>
+<section id="steps" class="callout callout-note card">
+<h2>Steps</h2>
+<p>How many steps of 1/N octave to move: from −N to +N, default 0. The
+ring is one octave, its dots the N steps, with 12-TET's semitones ticked
+outside it so you can see where an EDO step falls between them. The
+green arc runs from 0 at the top to where Steps lands: clockwise is up,
+anticlockwise is down. A whole turn either way (±N) is an octave.</p>
+<p><strong>Lowering Divisions</strong> limits Steps to the new ±N at
+once, and the dial shows the limited value. Retune keeps the value you
+set, though: raise Divisions again and Steps comes back. (Changing it
+for you would fight the host's automation.)</p>
+</section>
+<section id="octaves" class="callout callout-note card">
+<h2>Octaves</h2>
+<p>Whole octaves to move, from −4 to +4, default 0. The ring goes round
+like Steps, an octave a quarter turn: a whole turn clockwise is +4,
+anticlockwise −4.</p>
+</section>
+<section id="readouts" class="callout callout-note card">
+<h2>The Readouts</h2>
+<ul>
+<li><strong>The middle:</strong> the whole shift in cents (an octave is
+1200¢), and in semitones to three decimals.</li>
+<li><strong>Below the dial:</strong> the shift in words ("19-EDO: +1
+octave, +3 steps") and what <strong>MIDI 1.0</strong> makes of it: the
+nearest semitone, and how far that is from the real shift. For example,
+19-EDO +1 octave +3 steps is +1389.47¢, and MIDI 1.0 plays +14
+semitones, 10.5¢ sharp.</li>
+</ul>
+</section>
+<section id="dry" class="callout callout-note card">
+<h2>Dry</h2>
+<p>With <strong>Dry</strong> ticked, each note goes out twice: the
+original, unchanged, and the shifted one. You hear the interval Retune
+moves by as a two-note chord.</p>
+<ul>
+<li><strong>On its own key:</strong> when the shifted note lands on the
+original's key (no shift, or a small one that rounds there), only the
+shifted note plays: a MIDI channel can't sound one key twice.</li>
+<li><strong>While you hold notes:</strong> a note that started with Dry
+on ends with its original too, even if you untick Dry before letting go.
+A note that started with Dry off never gets one.</li>
+</ul>
+</section>
+<section id="hosts" class="callout callout-note card">
+<h2>Hosts and the Fraction</h2>
+<p>What Retune receives decides what it can send. It answers in the same
+form, so a synth gets the fraction only where the host passes it on.</p>
+<table>
+<thead>
+<tr>
+<th>Host</th>
+<th>Retune gets</th>
+<th>The synth hears</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>StageHand</td>
+<td>MIDI 2.0</td>
+<td>The exact step (Pitch 7.9)</td>
+</tr>
+<tr>
+<td>Bitwig</td>
+<td>CLAP notes</td>
+<td>The exact step, from a synth that honours tuning expressions</td>
+</tr>
+<tr>
+<td>A host that sends MIDI 1.0 only</td>
+<td>MIDI 1.0</td>
+<td>The nearest semitone</td>
+</tr>
+<tr>
+<td>Any host, VST3 or AUv2 build (Logic, Live, Cubase…)</td>
+<td>MIDI 1.0</td>
+<td>The nearest semitone</td>
+</tr>
+</tbody>
+</table>
+<p>The Unlikelyware synths play Pitch 7.9, and PlainOldSynth,
+StruckSynth, StruckRoom and StruckGaussian also play CLAP tuning
+expressions. A synth that ignores them plays the nearest key below (MIDI
+2.0) or the nearest key (CLAP notes).</p>
+<p><strong>Logic</strong> loads the AUv2 build, so there Retune rounds
+to semitones, like any 12-EDO transpose.</p>
+</section>
+<section id="midi" class="callout callout-note card">
+<h2>Held Notes and MIDI</h2>
+<ul>
+<li><strong>Changing the shift while notes are held</strong> moves only
+the notes you play next. Each sounding note remembers where it went, so
+its Note Off, pressure and other per-note messages follow it there, and
+no note gets stuck.</li>
+<li><strong>Notes shifted below 0 or above 127</strong> (MIDI's range)
+are dropped, with everything that belongs to them.</li>
+<li><strong>Everything that isn't a note</strong> passes through
+unchanged: CCs, channel pitch bend, program changes, SysEx, clock.</li>
+<li><strong>All Notes Off and All Sound Off</strong> pass through and
+make Retune forget that channel's held notes.</li>
+</ul>
+</section>
+<details class="disclosure">
+<summary class="disclosure-title subtle">MIDI 2.0 and CLAP details</summary>
+
+<div class="disclosure-content">
+<ul>
+<li><strong>MIDI 2.0:</strong> a Note On leaves with a Pitch 7.9
+attribute holding its exact pitch, and its note number is the whole
+part, so a receiver that ignores the attribute plays the nearest key
+below. A note that arrives with its own Pitch 7.9 keeps its offset from
+its key. A Pitch 7.25 per-note controller (an absolute pitch) moves by
+the note's whole shift, fraction included.</li>
+<li><strong>CLAP notes:</strong> a Note On goes to the nearest key,
+followed straight away by a tuning expression with the fraction (same
+note id). A tuning expression the host sends for that note gets the
+fraction added. Other note expressions follow the note to its new
+key.</li>
+<li><strong>Dry with CLAP notes:</strong> the original goes out with
+note id −1, leaving the host's note id to the shifted note.</li>
+</ul>
+</div>
+</details>
+
+<section id="tips" class="callout callout-note card">
+<h2>Tips</h2>
+<ul>
+<li><strong>Microtonal intervals over a 12-TET keyboard:</strong> pick
+N, then try Steps one at a time and listen to the interval with
+<strong>Dry</strong> ticked.</li>
+<li><strong>Quarter tones:</strong> 24-EDO, Steps ±1.</li>
+<li><strong>Two Retunes in a row add up:</strong> 19-EDO +3 then 31-EDO
+−2 is one shift of their sum, fraction included in MIDI 2.0 and with
+CLAP notes (MIDI 1.0 rounds each one).</li>
+<li><strong>Watch the MIDI 1.0 line:</strong> if it says "exact", the
+shift is whole semitones and every host plays it exactly.</li>
+</ul>
+</section>
+<section id="troubleshooting" class="callout callout-note card">
+<h2>Troubleshooting</h2>
+<ul>
+<li><strong>The shift sounds rounded to semitones.</strong> The host is
+sending MIDI 1.0, or you're using the VST3 or AUv2 build, or the synth
+ignores Pitch 7.9 and tuning expressions. See <a href="#hosts">Hosts and
+the Fraction</a>.</li>
+<li><strong>Changing a ring didn't change the note I'm holding.</strong>
+That's the design: only new notes take the new shift.</li>
+<li><strong>Some notes make no sound.</strong> They were shifted outside
+MIDI's 0–127 range. Lower Octaves or Steps.</li>
+<li><strong>With Dry ticked, I hear one note, not two.</strong> The
+shifted note lands on the original's key (see <a
+href="#dry">Dry</a>).</li>
+<li><strong>With Dry ticked and an octave shift, a note ends too
+soon.</strong> When you hold C4 and C5 and shift up an octave, C4's
+shifted note and C5's original both land on C5. The synth decides what
+that means: one that stacks voices plays both; one that retriggers ends
+the sound at the first Note Off.</li>
+<li><strong>Steps shows a smaller number than I set.</strong> Divisions
+is lower than your Steps, so Retune limits it to ±N; raise Divisions and
+it comes back.</li>
+<li><strong>Retune doesn't appear in Logic.</strong> Rescan Audio Units
+in Logic's Plug-in Manager, or quit and restart Logic.</li>
+<li><strong>A rebuilt Retune doesn't show its changes.</strong> Quit and
+restart the host: a running host keeps the plugin it loaded first.</li>
+</ul>
+</section>
+<p>VST is a registered trademark of Steinberg Media Technologies
+GmbH.</p>
+</div>
+</body>
+</html>

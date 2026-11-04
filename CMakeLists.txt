@@ -45,11 +45,21 @@ target_compile_options(dgl-opengl PRIVATE -w)   # vendored: its warnings aren't 
 # registers the same ones, so two in one host would collide. Harmless on Linux.
 target_compile_definitions(dgl-opengl PUBLIC DGL_NAMESPACE=RetuneDGL)
 
-# resources/* compiled in as bytes with DPF's res2c.py (the logo), read with NanoVG at run time.
+# resources/* compiled in as bytes with DPF's res2c.py: the logo, read with NanoVG at run time, and
+# the help page, which the editor's Help button writes out and opens. Not help.md: res2c.py names
+# each symbol by the file's stem, so it would collide with help.html.
+#
+# help.html is generated from help.md (beside it) by pandoc with the Unlikelyware products' shared
+# template, and committed; after editing help.md, run from here:
+#   pandoc -f commonmark_x-smart -t html5 \
+#     --template ../../Dev-Audio/Shared/Help/help-template.html \
+#     --metadata pagetitle=help-Retune resources/help.md -o resources/help.html
+# (the template, in Dev-Audio beside Dev-MIDI, inlines its help.css).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(RETUNE_RESOURCES_HPP "${CMAKE_BINARY_DIR}/generated/EmbeddedResources.hpp")
 set(RETUNE_RESOURCES_CPP "${CMAKE_BINARY_DIR}/generated/EmbeddedResources.cpp")
-file(GLOB RETUNE_RESOURCE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/*.png")
+file(GLOB RETUNE_RESOURCE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/*.png"
+    "${CMAKE_SOURCE_DIR}/resources/*.html")
 add_custom_command(
     OUTPUT "${RETUNE_RESOURCES_HPP}" "${RETUNE_RESOURCES_CPP}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/generated/resources"

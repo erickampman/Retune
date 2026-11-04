@@ -101,7 +101,8 @@ Retune/
   src/plugin.cpp         clap_entry, note ports (in + out), params, state, the editor's edits
   src/plugin_gui.h       the seam between the plugin and its editor
   src/UI/                the editor: RetuneUI.cpp, Views.hpp (the dial) and the house logo
-  resources/             the logo, embedded at build time
+  resources/             the logo and the help page (help.md, and help.html built from it), embedded
+                         at build time
   test/                  core unit tests + a headless host test that dlopens the .clap
 ```
 
@@ -171,8 +172,13 @@ Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut d
     turn clockwise +4 and anticlockwise −4.
   - In the middle the whole shift in cents; in the arc's gap the shift in words and what MIDI 1.0
     rounds it to ("+14 semitones, 10.5¢ sharp").
-- **Dry** is a checkbox at the header's right ("Dry: the originals too"), NoteGran's Toggle with
-  its label beside the box.
+- **Dry** is a checkbox in the header ("Dry: the originals too"), NoteGran's Toggle with its label
+  beside the box.
+- **Help** (2026-11-03) is a "?" box at the header's right, StruckSynth's HelpButton without its
+  caption: a click writes the embedded help page and logo to `Retune-help` in the temp folder and
+  opens it in the browser, as the synths do. The page is `resources/help.md` in the synths' layout
+  (cards, an On This Page index, disclosures), built into `resources/help.html` with pandoc and the
+  products' shared template (the command is in CMakeLists.txt) and committed.
 - **Handling:** a handle drags round its ring; Steps and Octaves carry on round to their ends (±N,
   ±4) rather than flipping sign, and a drag into Divisions' gap stays at the end it went past. A
   press elsewhere on a ring jumps there (the nearer way round from 0), a double-click restores the
