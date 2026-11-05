@@ -1,0 +1,70 @@
+# Build Retune (CLAP, VST3, and AUv2 on macOS) and run its tests on every push, on Linux and
+# macOS, with BUILDING.md's steps.
+#
+# external/uw-core, external/dpf and the pugl fork inside it are private repos, which the
+# workflow's own token can't read: the SUBMODULES_TOKEN secret (read access to them) is
+# used when set.
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04   # the oldest Ubuntu supported; alsa-lib 1.2.11 (uw-core's ALSA code needs 1.2.10+)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+      # fetch_deps.sh's own `git submodule` clones don't get checkout's token.
+      - name: Credentials for the private submodules
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/erickampman/".insteadOf \
+            "https://github.com/erickampman/"
+      - name: Fetch pinned dependency submodules
+        run: tools/fetch_deps.sh
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          # One package list for every Unlikelyware project, as in BUILDING.md
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 git \
+            libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxinerama-dev \
+            libxcb1-dev libx11-xcb-dev libxcb-util-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libasound2-dev libjack-jackd2-dev \
+            libxfixes-dev libxi-dev libxss-dev libxtst-dev libwayland-dev wayland-protocols \
+            libegl1-mesa-dev libgles2-mesa-dev libdrm-dev libgbm-dev libdecor-0-dev libudev-dev \
+            libdbus-1-dev libibus-1.0-dev
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  macos:
+    runs-on: macos-26   # Apple Silicon, macOS 26: the deployment target (R0-10)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+      # fetch_deps.sh's own `git submodule` clones don't get checkout's token.
+      - name: Credentials for the private submodules
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/erickampman/".insteadOf \
+            "https://github.com/erickampman/"
+      - name: Fetch pinned dependency submodules
+        run: tools/fetch_deps.sh
+      - name: Install build dependencies
+        run: brew install ninja
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
