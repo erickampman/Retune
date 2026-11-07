@@ -33,7 +33,7 @@
 - [x] Dialect log (`-DRETUNE_DIALECT_LOG=ON`): host `supported_dialects()` and incoming event counts, to ~/Library/Logs/Retune-dialects.log
 - [x] Dialect log in Bitwig 6.1.3: host dialects CLAP | MIDI | MIDI_MPE (no MIDI2); Retune got MIDI 1.0 only
 - [ ] Dialect log in REAPER
-- [ ] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below)
+- [x] Heard through StageHand → Retune → StruckSynth (needs StageHand's note-effect hosting, below) (2026-11-07, on the Mac; Dry plays one note under a semitone, a known gap in the README)
 
 ## M3: CLAP note dialect (keeps the fraction in Bitwig)
 - [x] Note ports also advertise `CLAP` (preference stays MIDI2)
@@ -56,6 +56,7 @@
 - [ ] Editor seen in StageHand, Bitwig and an AU host, and on Linux
 - [x] Dry: the original notes out too, in every dialect, latched; a checkbox in the editor (2026-11-03)
 - [ ] Dry: a dry note and another key's shifted note on one key (uw-core's NoteRemap owner table)
+- [ ] Dry over MIDI 2.0 with a shift under a semitone: only the shifted note sounds (it takes the original's key). Possible fix: move the original to a free key with its true pitch as a Pitch 7.9 attribute. A known gap for the 0.9.0 preview (decided 2026-11-07)
 - [x] Help page (resources/help.md → help.html, the shared template) and a Help button in the editor (2026-11-03)
 
 ## Outside Retune (StageHand)

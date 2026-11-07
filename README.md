@@ -65,6 +65,13 @@ key twice.
 The Unlikelyware synths ([PlainOldSynth](https://github.com/erickampman/PlainOldSynth),
 [StruckSynth](https://github.com/erickampman/StruckSynth) and the rest) play Pitch 7.9 notes.
 
+## Known gaps
+
+- **Dry with a shift under a semitone, over MIDI 2.0 or MIDI 1.0** (StageHand, for one): you hear
+  only the shifted note. It goes out on the key below its pitch, which is the original's own key,
+  and a channel can't sound one key twice. Hosts that send CLAP notes (Bitwig) play both. Shifts of
+  a semitone or more play both everywhere.
+
 ## Installing
 
 The download holds `Retune.clap`. Put it in your CLAP folder (create the folder if it isn't there),
