@@ -5,8 +5,8 @@ It is CLAP-first, with the same layout as StruckSynth and PlainOldSynth: a hand-
 point and the vendored free-audio **clap-wrapper** for the other formats.
 
 **Status (2026-10-20):** phases 1 and 2 are done in code: RetuneCore over uw-core's uw::ump, and the
-raw CLAP plugin (clap-validator clean, headless host test). Still to do in phase 2: run the dialect
-log in Bitwig and REAPER, and listen through StageHand once it can host note effects.
+raw CLAP plugin (clap-validator clean, headless host test). The dialect log has since
+been run in Bitwig (2026-10-21) and REAPER (2026-11-09), and Retune heard through StageHand (2026-11-07).
 
 ## Decisions so far
 
@@ -236,5 +236,8 @@ AU/VST3 wrappers (phase 3) move down the list.
   MIDI_MPE`, with no MIDI2. Retune received only MIDI 1.0 Note On/Off (158 each). So in Bitwig the
   MIDI 2.0 path is never used and the fraction is rounded away; only the CLAP dialect (tuning
   expression) could keep it there.
+  **Dialect log, REAPER 7.79 (2026-11-09):** the host's note dialects are `CLAP | MIDI`, with no
+  MIDI2. Retune received only MIDI 1.0 Note On/Off (18 each), although its ports offer CLAP too. So
+  REAPER rounds to semitones.
 
 VST is a registered trademark of Steinberg Media Technologies GmbH.

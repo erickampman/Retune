@@ -59,6 +59,7 @@ key twice.
 |---|---|---|
 | [StageHand](https://github.com/erickampman/StageHand) | MIDI 2.0 | Yes (Pitch 7.9) |
 | Bitwig | CLAP notes | Yes, to a synth that honours tuning expressions |
+| REAPER (7.79) | MIDI 1.0 | Rounded to semitones |
 | Hosts that send MIDI 1.0 only | MIDI 1.0 | Rounded to semitones |
 | VST3 and AUv2 builds | MIDI 1.0 | Rounded to semitones |
 
