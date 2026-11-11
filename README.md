@@ -83,15 +83,12 @@ then rescan plugins in your host:
 | For you | `~/.clap` | `~/Library/Audio/Plug-Ins/CLAP` |
 | For every user | `/usr/lib/clap` | `/Library/Audio/Plug-Ins/CLAP` |
 
-On macOS, `~/Library` is hidden in Finder: Go ▸ Go to Folder opens it. The 0.9 previews aren't
-notarized, so macOS won't load a downloaded plugin until its quarantine flag is cleared:
+On macOS, `~/Library` is hidden in Finder: Go ▸ Go to Folder opens it.
 
-```bash
-xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/Retune.clap
-```
-
-A host that is already running keeps the plugins it loaded: quit and restart it. To build Retune
-yourself instead, see below.
+A host that is already running keeps the plugins it loaded: quit and restart it. What each platform
+needs, and more on rescanning, is in the downloads repo's [install
+notes](https://github.com/erickampman/unlikelyware#installing). To build Retune yourself instead,
+see below.
 
 ## Building from source
 

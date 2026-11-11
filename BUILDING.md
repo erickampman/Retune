@@ -108,8 +108,7 @@ cp -R build/Retune.vst3 ~/Library/Audio/Plug-Ins/VST3/
 
 For every user instead, the same folders without `~` (`/usr/lib/clap` and `/usr/lib/vst3` on Linux,
 `/Library/Audio/Plug-Ins/...` on macOS), with `sudo`. Then rescan in the host. A host that is
-already running keeps the plugin it loaded first: quit and restart it after a rebuild. A plugin you
-built yourself has no quarantine flag, so macOS loads it without the steps a downloaded one needs.
+already running keeps the plugin it loaded first: quit and restart it after a rebuild.
 
 
 ## Options
