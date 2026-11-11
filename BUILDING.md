@@ -160,6 +160,33 @@ When the change is ready, push uw-core first, then move Retune's submodule pin
   The VST3 SDK's own CMake rejects an Xcode path with spaces. That only matters when you build its
   `validator` yourself: point `DEVELOPER_DIR` at a symlink without spaces.
 
+## Making a release package
+
+For the maintainer only: a release package is signed with the Developer ID certificate and
+published to the [downloads repo](https://github.com/erickampman/unlikelyware), so these steps
+need that keychain setup and write access there. Building from source, as above, needs neither.
+
+Once per machine, point `UW_DOWNLOADS_DIR` at a checkout of the downloads repo, in your shell's
+startup file (`~/.zprofile` or `~/.zshrc` with zsh, `~/.bashrc` with bash):
+
+```bash
+export UW_DOWNLOADS_DIR=~/path/to/unlikelyware
+```
+
+Then, in this checkout, after building the release tag as above:
+
+```bash
+"$UW_DOWNLOADS_DIR/scripts/package.sh"
+```
+
+```bash
+"$UW_DOWNLOADS_DIR/scripts/publish.sh" v0.9.0
+```
+
+The first makes this platform's package (on macOS, signed and notarized); the second uploads it
+to the release. The details are in the downloads repo's
+[README](https://github.com/erickampman/unlikelyware#making-a-release-package).
+
 ## How this differs from the other projects
 
 Every Unlikelyware project builds the same way: `git clone`, `tools/fetch_deps.sh`, the three
