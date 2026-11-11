@@ -123,6 +123,7 @@ if(APPLE)
     set_target_properties(Retune PROPERTIES
         BUNDLE TRUE
         BUNDLE_EXTENSION "clap"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/cmake/clap-Info.plist.in"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.unlikelyware.retune"
         MACOSX_BUNDLE_BUNDLE_NAME "Retune"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
