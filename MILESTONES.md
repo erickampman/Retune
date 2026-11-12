@@ -48,7 +48,7 @@
 - [x] Under clap-wrapper the ports prefer MIDI 1.0, and both note ports have id 0 (the AUv2 wrapper routes output by id)
 - [ ] AUv3: needs an app extension inside a containing app; deferred
 - [ ] VST3 built and checked on Linux
-- [ ] Checked in Logic (MIDI FX slot), REAPER and Bitwig. REAPER 7.79 on the Mac (2026-11-12): the AUv2 Retune in front of IFSynth's VST3 doesn't shift the notes, while the CLAP Retune in the same place shifts them (rounded to semitones) in front of the CLAP, VST3 and AUv2 of all seven synths, so REAPER seems not to pass an `aumi` effect's MIDI output on. Logic and Bitwig still to check for the AUv2 and VST3. The CLAP in Bitwig on the Mac (2026-11-12): 19 divisions, 1 step comes out between the semitones, not rounded, and a saved project reopens with its settings
+- [ ] Checked in Logic (MIDI FX slot), REAPER and Bitwig. REAPER 7.79 on the Mac (2026-11-12): the AUv2 Retune in front of IFSynth's VST3 doesn't shift the notes, while the CLAP Retune in the same place shifts them (rounded to semitones) in front of the CLAP, VST3 and AUv2 of all seven synths, so REAPER seems not to pass an `aumi` effect's MIDI output on. Logic and Bitwig still to check for the AUv2 and VST3. The CLAP in Bitwig on the Mac (2026-11-12): 19 divisions, 1 step comes out between the semitones, not rounded, and a saved project reopens with its settings; the same in StageHand on the Mac, through its MIDI 2.0, with the set saved and reopened (ReleaseUMP R3-4)
 
 ## M5: Later
 - [ ] Wrapper patches to keep the fraction (AU MIDI 2.0 event lists, VST3 `noteOn.tuning`)
