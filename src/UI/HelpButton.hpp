@@ -8,6 +8,9 @@
 #define RETUNE_HELPBUTTON_HPP
 
 #include "NanoVG.hpp"
+#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
+#include "uw/base/HelpServer.h"   // uw-core: help over loopback on Linux
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -106,6 +109,15 @@ private:
     // Rewritten on every click, so a newer build's page replaces an older one's.
     void openHelp() const
     {
+#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
+        // Linux: served over loopback (uw-core's HelpServer), not written to /tmp,
+        // as a snap or Flatpak browser can't read the real /tmp.
+        std::vector<uw::HelpServer::File> files;
+        for (const File& f : fFiles)
+            files.push_back({f.name, std::string(reinterpret_cast<const char*>(f.data), f.size)});
+        fHelpServer.open(std::move(files));
+        return;
+#endif
         namespace fs = std::filesystem;
         std::error_code ec;
         const fs::path dir = fs::temp_directory_path(ec) / fFolder;
@@ -134,6 +146,9 @@ private:
     }
 
     std::vector<File> fFiles;
+#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
+    mutable uw::HelpServer fHelpServer;   // openHelp()'s, while the editor is open
+#endif
     std::string       fLabel;
     std::string       fFolder = "Retune-help";
     bool              fHasFont = false;
