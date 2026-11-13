@@ -1,0 +1,78 @@
+name: Bug report
+description: Something doesn't work, sounds wrong, or crashes
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Check the README first: known problems are listed there.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The plugin's version, from the download's file name or the host's plugin list
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - Linux (x86-64)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "macOS 26.1, Ubuntu 24.04, Fedora 43, ..."
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host and its version
+      placeholder: "REAPER 7.79, Bitwig Studio 5.3, StageHand 0.9.0, ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Plugin format
+      options:
+        - CLAP
+        - VST3
+        - AUv2
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where the build came from
+      options:
+        - Downloaded release
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Load the plugin on a track
+        2. ...
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Host logs, crash reports, a saved project or preset, screenshots or recordings. Drag files in.
