@@ -35,8 +35,7 @@ Of those libraries Retune uses only the X11 and OpenGL ones, for the editor. It 
 `UW_CORE_UMP_ONLY`, which makes only `uw::ump` (no JACK, ALSA, CoreAudio or CoreMIDI). The editor
 uses DPF (`external/dpf`) for drawing only: DGL, NanoVG and pugl, as NoteGran and StruckSynth do.
 DPF is the author's fork (`erickampman/DPF`, which pins the pugl fork `erickampman/pugl`), as every
-DPF user's is; while the repos are private, cloning needs access to both. Python 3 embeds the logo
-at build time.
+DPF user's is. Python 3 embeds the logo at build time.
 
 ## Get the source
 
