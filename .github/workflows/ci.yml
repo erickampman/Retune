@@ -1,9 +1,5 @@
 # Build Retune (CLAP, VST3, and AUv2 on macOS) and run its tests on every push, on Linux and
 # macOS, with BUILDING.md's steps.
-#
-# external/uw-core, external/dpf and the pugl fork inside it are private repos, which the
-# workflow's own token can't read: the SUBMODULES_TOKEN secret (read access to them) is
-# used when set.
 name: CI
 
 on:
@@ -15,15 +11,6 @@ jobs:
     runs-on: ubuntu-24.04   # the oldest Ubuntu supported; alsa-lib 1.2.11 (uw-core's ALSA code needs 1.2.10+)
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
-      # fetch_deps.sh's own `git submodule` clones don't get checkout's token.
-      - name: Credentials for the private submodules
-        env:
-          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/erickampman/".insteadOf \
-            "https://github.com/erickampman/"
       - name: Fetch pinned dependency submodules
         run: tools/fetch_deps.sh
       - name: Install build dependencies
@@ -49,15 +36,6 @@ jobs:
     runs-on: macos-26   # Apple Silicon, macOS 26: the deployment target (R0-10)
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
-      # fetch_deps.sh's own `git submodule` clones don't get checkout's token.
-      - name: Credentials for the private submodules
-        env:
-          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/erickampman/".insteadOf \
-            "https://github.com/erickampman/"
       - name: Fetch pinned dependency submodules
         run: tools/fetch_deps.sh
       - name: Install build dependencies
