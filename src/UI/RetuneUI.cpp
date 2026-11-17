@@ -3,7 +3,7 @@
 // NoteGran's shell, cut down to one plugin: the header (the Unlikelyware logo and "Retune" in its
 // accent) and one view, the dial (Views.hpp's ShiftDial): Divisions as an arc outside, Steps the
 // ring inside it, Octaves the ring inside that, each dragged round by its handle; Dry a checkbox in
-// the header, beside Help (a "?" box that opens the help page in the browser). Steps turns
+// the header, beside Help (a "?" box that opens the help page in a window of its own). Steps turns
 // through ±N, the range Retune uses, and shows the clamped value when a lower N has cut the stored
 // one (docs/design.md: the stored value is never rewritten).
 //
@@ -66,11 +66,11 @@ public:
                                        EmbeddedResources::Unlikelyware_Final_ColorDataSize);
         fDial = std::make_unique<ShiftDial>(this, this);
         fDial->setAccent(kAccent);
-        // help.html shows the logo as "Unlikelyware.png", so it is written out under that name.
-        fHelp = std::make_unique<HelpButton>(this, std::vector<HelpButton::File>{
-            {"Retune-help.html", EmbeddedResources::helpData, EmbeddedResources::helpDataSize},
-            {"Unlikelyware.png", EmbeddedResources::Unlikelyware_Final_ColorData,
-             EmbeddedResources::Unlikelyware_Final_ColorDataSize}});
+        // help.md shows the logo as "Unlikelyware.png".
+        fHelp = std::make_unique<HelpButton>(this, "Retune Help",
+            EmbeddedResources::helpData, EmbeddedResources::helpDataSize,
+            std::vector<DGL_NAMESPACE::uwhelp::Image>{{"Unlikelyware.png", EmbeddedResources::Unlikelyware_Final_ColorData,
+                                                       EmbeddedResources::Unlikelyware_Final_ColorDataSize}});
         fDry = std::make_unique<Toggle>(this, this);
         fDry->setId(RT_PARAM_DRY);
         fDry->setLabel("Dry: the originals too");

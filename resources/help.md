@@ -46,7 +46,7 @@ The host saves every setting with its project.
 
 ::: {.callout .callout-note .card}
 ## The Window {#window}
-**The header:** the Unlikelyware logo (a click opens unlikelyware.com), **Retune**, the **Dry** checkbox, and **Help** (the **?** box that opens this page in your browser).
+**The header:** the Unlikelyware logo (a click opens unlikelyware.com), **Retune**, the **Dry** checkbox, and **Help** (the **?** box that opens this page in a window of its own).
 
 **The dial:** three controls as rings round one centre, each named just inside its top and each with a round handle that shows its value:
 - **Divisions**, the outer arc

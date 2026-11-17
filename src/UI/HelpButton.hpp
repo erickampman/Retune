@@ -1,22 +1,15 @@
 // HelpButton.hpp — a "?" box with a caption above it, styled like Dropdown so the two sit together
-// in the header. A click writes the embedded help page (and the image it shows) to a folder under
-// the system temp directory and opens it in the system's default browser, so the built plugin
-// still has no filesystem dependency of its own.
+// in the header. A click opens the help page in a window of the plugin's own (uw-core's
+// HelpWindow): the embedded help.md, drawn with NanoVG, with no browser, server or files.
 // Copied from StruckSynth's src/UI (the house widget kit); Retune's changes are marked "Retune:".
 
 #ifndef RETUNE_HELPBUTTON_HPP
 #define RETUNE_HELPBUTTON_HPP
 
 #include "NanoVG.hpp"
-#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
-#include "uw/base/HelpServer.h"   // uw-core: help over loopback on Linux
-#endif
+#include "uw/dgl/HelpWindow.hpp"   // uw-core: the help page in its own window
 
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
 #include <string>
-#include <system_error>
 #include <vector>
 
 START_NAMESPACE_DGL
@@ -24,24 +17,17 @@ START_NAMESPACE_DGL
 class HelpButton : public NanoSubWidget
 {
 public:
-    // A file the page needs, written next to it under `name` (the name the HTML refers to).
-    struct File
-    {
-        const char*  name;
-        const uchar* data;
-        uint         size;
-    };
-
-    // files[0] is the page itself.
-    HelpButton(Widget* parent, std::vector<File> files)
-        : NanoSubWidget(parent), fFiles(std::move(files))
+    // The page (help.md), the images it shows by the names it uses, and where it opens: "#id", or
+    // nullptr for the top.
+    HelpButton(Widget* parent, std::string title, const uchar* page, uint pageSize,
+               std::vector<uwhelp::Image> images, const char* anchor = nullptr)
+        : NanoSubWidget(parent), fTitle(std::move(title)), fPage(page), fPageSize(pageSize),
+          fImages(std::move(images)), fAnchor(anchor ? anchor : "")
     {
         fHasFont = loadSharedResources();
     }
 
     void setLabel(const std::string& label) { fLabel = label; }   // Retune: empty, the box alone
-    // Retune: the folder under the temp directory the page is written to.
-    void setFolder(const std::string& folder) { fFolder = folder; }
     void setUiScale(float s)
     {
         fUiScale = s;
@@ -106,51 +92,18 @@ private:
         return (rem > 0.0f ? rem * 0.5f : 0.0f) + fLabelH;
     }
 
-    // Rewritten on every click, so a newer build's page replaces an older one's.
-    void openHelp() const
+    void openHelp()
     {
-#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
-        // Linux: served over loopback (uw-core's HelpServer), not written to /tmp,
-        // as a snap or Flatpak browser can't read the real /tmp.
-        std::vector<uw::HelpServer::File> files;
-        for (const File& f : fFiles)
-            files.push_back({f.name, std::string(reinterpret_cast<const char*>(f.data), f.size)});
-        fHelpServer.open(std::move(files));
-        return;
-#endif
-        namespace fs = std::filesystem;
-        std::error_code ec;
-        const fs::path dir = fs::temp_directory_path(ec) / fFolder;
-        if (ec) return;
-        fs::create_directories(dir, ec);
-        if (ec) return;
-
-        for (const File& f : fFiles)
-        {
-            std::ofstream out(dir / f.name, std::ios::binary | std::ios::trunc);
-            if (!out) return;
-            out.write(reinterpret_cast<const char*>(f.data), static_cast<std::streamsize>(f.size));
-        }
-
-        // The path is ours (temp dir + fixed names), but quote it: temp paths can contain spaces.
-        const std::string page = (dir / fFiles.front().name).string();
-#if defined(DISTRHO_OS_MAC)
-        const std::string cmd = "open \"" + page + "\"";
-#elif defined(DISTRHO_OS_WINDOWS)
-        const std::string cmd = "start \"\" \"" + page + "\"";
-#else
-        const std::string cmd = "xdg-open \"" + page + "\" >/dev/null 2>&1 &";
-#endif
-        const int rc = std::system(cmd.c_str());
-        (void)rc; // best-effort; nothing sensible to do if the browser launch fails
+        fHelp.open(*this, fTitle.c_str(), fPage, fPageSize, fImages, fAnchor.empty() ? nullptr : fAnchor.c_str());
     }
 
-    std::vector<File> fFiles;
-#if !defined(DISTRHO_OS_MAC) && !defined(DISTRHO_OS_WINDOWS)
-    mutable uw::HelpServer fHelpServer;   // openHelp()'s, while the editor is open
-#endif
+    std::string                 fTitle;
+    const uchar*                fPage     = nullptr;
+    uint                        fPageSize = 0;
+    std::vector<uwhelp::Image>  fImages;
+    std::string                 fAnchor;
+    uwhelp::HelpOpener          fHelp;   // the help window, while the editor is open
     std::string       fLabel;
-    std::string       fFolder = "Retune-help";
     bool              fHasFont = false;
     bool              fPressed = false;
     float             fUiScale = 1.0f;

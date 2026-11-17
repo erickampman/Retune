@@ -175,10 +175,12 @@ Asked for "a custom UI, similar to NoteGran's", so it is NoteGran's editor cut d
 - **Dry** is a checkbox in the header ("Dry: the originals too"), NoteGran's Toggle with its label
   beside the box.
 - **Help** (2026-11-03) is a "?" box at the header's right, StruckSynth's HelpButton without its
-  caption: a click writes the embedded help page and logo to `Retune-help` in the temp folder and
-  opens it in the browser, as the synths do. The page is `resources/help.md` in the synths' layout
-  (cards, an On This Page index, disclosures), built into `resources/help.html` with pandoc and the
-  products' shared template (the command is in CMakeLists.txt) and committed.
+  caption. Since 2026-11-17 a click opens the embedded help page in a window of the plugin's own
+  (uw-core's HelpWindow), as the synths do: no browser and no server. (Until then it wrote the page
+  and logo to `Retune-help` in the temp folder and opened it in the browser.) The page is
+  `resources/help.md` in the synths' layout (cards, an On This Page index, disclosures), which the
+  window reads; `resources/help.html`, for the web, is built from it with pandoc and the products'
+  shared template (the command is in CMakeLists.txt) and committed.
 - **Handling:** a handle drags round its ring; Steps and Octaves carry on round to their ends (±N,
   ±4) rather than flipping sign, and a drag into Divisions' gap stays at the end it went past. A
   press elsewhere on a ring jumps there (the nearer way round from 0), a double-click restores the

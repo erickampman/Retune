@@ -5,6 +5,11 @@ All notable changes to Retune. Versions follow the git tags; the format is
 
 ## [Unreleased]
 
+### Changed
+
+- Help opens the help page in a window of the plugin's own, not in the web browser. Nothing is
+  written to the temp folder, and on Linux no web server runs in the host any more.
+
 ## [0.9.0] - 2026-11-14
 
 First public preview.
