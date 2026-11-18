@@ -121,8 +121,10 @@ Pass these to the first command (`cmake -B build ... -DNAME=VALUE`).
 | `RETUNE_DIALECT_LOG` | `OFF` | A diagnostic plugin that logs the host's note dialects and every incoming note event. Leave it off for normal use. |
 | `RETUNE_UW_CORE_DIR` | `external/uw-core` | Build against another uw-core clone (below). |
 
-The wrapped formats keep only the MIDI 1.0 (rounded) behaviour. Inside clap-wrapper, Retune prefers
-the MIDI 1.0 dialect (docs/design.md, "What clap-wrapper does with a note effect").
+clap-wrapper is Unlikelyware's fork (github.com/erickampman/clap-wrapper, `unlikelyware` branch, from
+v0.16.0), whose AUv2 asks the host for MIDI 2.0 and passes MIDI 2.0 output whole: inside it Retune
+prefers MIDI 2.0, so a host that takes it (Logic) keeps the fraction. The VST3 keeps only the MIDI 1.0
+(rounded) behaviour (docs/design.md, "What clap-wrapper does with a note effect").
 
 ## Checking a build
 
@@ -192,10 +194,10 @@ commands under "Build and test", and for a plugin `cmake --build build --target 
 same package list, the same `build/` folder, the same option names (`<PROJECT>_BUILD_VST3`,
 `<PROJECT>_UW_CORE_DIR` and so on). What's different here, and why:
 
-- No `patches/`: the synths patch clap-wrapper's AUv2 view to call the plugin's `gui->show()`, which
-  starts their render timer. Retune's editor starts its timer at `set_parent` as well (as NoteGran's
-  does), so the unpatched AUv2 view draws.
-- The VST3 and AUv2 builds keep only the MIDI 1.0 (rounded) behaviour (above).
+- clap-wrapper is Unlikelyware's fork, as in every Unlikelyware plugin built with it: its AUv2 view
+  calls the plugin's `gui->show()` (upstream's never does), and its AUv2 keeps MIDI 2.0 output whole.
+  Retune's editor also starts its timer at `set_parent`, as NoteGran's does.
+- The VST3 build keeps only the MIDI 1.0 (rounded) behaviour (above).
 - No `_WERROR` option: the seven synths have one and their CI turns it on; this project's build has none, so the option can be added when CI arrives.
 - CI (`.github/workflows/ci.yml`) runs on `ubuntu-24.04`, the oldest Ubuntu supported, not `ubuntu-latest`, and on `macos-26`.
 

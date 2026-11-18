@@ -10,7 +10,7 @@ Retune is MIT licensed (see the LICENSE file). Its plugins contain the component
 | [NanoVG, with fontstash](https://github.com/memononen/nanovg) | in DPF | zlib | drawing the user interface, inside DPF |
 | [stb_image and stb_truetype](https://github.com/nothings/stb) | in DPF | Public domain (or MIT) | image and font loading, inside NanoVG |
 | [DejaVu Sans font](https://dejavu-fonts.github.io/) | in DPF | Bitstream Vera / DejaVu (free) | the interface text, embedded by DPF |
-| [clap-wrapper](https://github.com/free-audio/clap-wrapper) | v0.16.0 | MIT | builds the VST3 and AUv2 plugins from the CLAP one |
+| [clap-wrapper, Unlikelyware's fork](https://github.com/erickampman/clap-wrapper) | v0.16.0 + `unlikelyware` branch | MIT | builds the VST3 and AUv2 plugins from the CLAP one |
 | [VST3 SDK](https://github.com/steinbergmedia/vst3sdk) | v3.8.0_build_66 | MIT | the VST3 plugin (through clap-wrapper) |
 | [AudioUnitSDK](https://github.com/apple/AudioUnitSDK) | 1.1.0 | Apache-2.0 | the AUv2 plugin on macOS; clap-wrapper downloads it when configuring |
 

@@ -63,11 +63,26 @@ const clap_host_t kHost = {
     .request_callback = hostNoop,
 };
 
-// The same host as clap-wrapper reports itself (clap_proxy.cpp): the real host's name, its url.
+// The same host as clap-wrapper's AUv2 reports itself (clap_proxy.cpp): the real host's name with
+// the wrapper's, its url.
 const clap_host_t kWrapperHost = {
     .clap_version     = CLAP_VERSION_INIT,
     .host_data        = nullptr,
-    .name             = "Logic Pro",
+    .name             = "Logic Pro (CLAP-as-AUv2)",
+    .vendor           = "The CLAP Wrapper Team",
+    .url              = "https://github.com/free-audio/clap-wrapper",
+    .version          = "0.16.0",
+    .get_extension    = hostGetExtension,
+    .request_restart  = hostNoop,
+    .request_process  = hostNoop,
+    .request_callback = hostNoop,
+};
+
+// The VST3 wrapper's.
+const clap_host_t kVst3WrapperHost = {
+    .clap_version     = CLAP_VERSION_INIT,
+    .host_data        = nullptr,
+    .name             = "Cubase (CLAP-as-VST3)",
     .vendor           = "The CLAP Wrapper Team",
     .url              = "https://github.com/free-audio/clap-wrapper",
     .version          = "0.16.0",
@@ -274,14 +289,19 @@ void testNotePorts() {
 }
 
 void testWrappedPrefersMidi1() {
-    Instance r(&kWrapperHost);
-    CHECK(r.ok());
-    if (!r.ok()) return;
-    for (bool input : {true, false}) {
-        clap_note_port_info_t info{};
-        CHECK(r.notePorts->get(r.plugin, 0, input, &info));
-        CHECK(info.preferred_dialect == CLAP_NOTE_DIALECT_MIDI);
-        CHECK((info.supported_dialects & CLAP_NOTE_DIALECT_CLAP) != 0);   // VST3 sends CLAP notes
+    // The AUv2 wrapper (Unlikelyware's fork) carries MIDI 2.0 both ways: MIDI2 preferred. The VST3
+    // wrapper carries no fraction: MIDI 1.0.
+    for (const clap_host_t* host : {&kWrapperHost, &kVst3WrapperHost}) {
+        Instance r(host);
+        CHECK(r.ok());
+        if (!r.ok()) return;
+        const uint32_t want = host == &kWrapperHost ? CLAP_NOTE_DIALECT_MIDI2 : CLAP_NOTE_DIALECT_MIDI;
+        for (bool input : {true, false}) {
+            clap_note_port_info_t info{};
+            CHECK(r.notePorts->get(r.plugin, 0, input, &info));
+            CHECK(info.preferred_dialect == want);
+            CHECK((info.supported_dialects & CLAP_NOTE_DIALECT_CLAP) != 0);   // VST3 sends CLAP notes
+        }
     }
 }
 

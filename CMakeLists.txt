@@ -145,9 +145,10 @@ add_custom_target(install-clap
     COMMENT "Symlinking Retune.clap into ${RETUNE_CLAP_DIR}")
 
 # --- VST3 / AUv2 via clap-wrapper (M4) --------------------------------------------------------
-# The same plugin, wrapped. Only the MIDI 1.0 (rounded) behaviour survives: the AUv2 wrapper turns
-# MIDI 2.0 output into MIDI 1.0, and the VST3 wrapper passes note on/off only, with tuning 0
-# (docs/design.md, "What clap-wrapper does with a note effect"). clap-wrapper v0.16.0, as in PlainOldSynth.
+# The same plugin, wrapped. The VST3 keeps only the MIDI 1.0 (rounded) behaviour: its wrapper passes
+# note on/off only, with tuning 0. The AUv2 keeps MIDI 2.0 with the fork below
+# (docs/design.md, "What clap-wrapper does with a note effect"). clap-wrapper is Unlikelyware's
+# fork (erickampman/clap-wrapper, `unlikelyware`: v0.16.0 plus an AUv2 that passes MIDI 2.0 whole).
 option(RETUNE_BUILD_VST3 "Build Retune.vst3 via clap-wrapper" ON)
 option(RETUNE_BUILD_AUV2 "Build Retune.component (AUv2 MIDI effect) via clap-wrapper (macOS)" ${APPLE})
 

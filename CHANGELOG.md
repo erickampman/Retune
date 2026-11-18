@@ -7,6 +7,9 @@ All notable changes to Retune. Versions follow the git tags; the format is
 
 ### Changed
 
+- The AUv2 is built with Unlikelyware's fork of clap-wrapper and sends MIDI 2.0 to a host that takes
+  it, so in Logic the shift's fraction reaches the synth instead of being rounded to a semitone.
+
 - Help opens the help page in a window of the plugin's own, not in the web browser. Nothing is
   written to the temp folder, and on Linux no web server runs in the host any more.
 

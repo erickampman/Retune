@@ -25,7 +25,7 @@ A CLAP plugin that declares `CLAP_PLUGIN_FEATURE_NOTE_EFFECT` and has a note *ou
 | Format | Loads as a MIDI effect? | MIDI 1.0 out | MIDI 2.0 out (Pitch 7.9) |
 |---|---|---|---|
 | **CLAP** (native) | Yes | Yes | **Yes**: we control the port dialects |
-| **AUv2** | Yes, type `aumi` (`build-helper.cpp:172`) | Yes | **No**: `CLAP_EVENT_MIDI2` is down-converted to MIDI 1.0 (`wrapasauv2.cpp`, `send`), so the fraction is lost |
+| **AUv2** | Yes, type `aumi` (`build-helper.cpp:172`) | Yes | **Yes, with Unlikelyware's fork** (2026-11-18, `unlikelyware` branch): upstream down-converts `CLAP_EVENT_MIDI2` to MIDI 1.0 (`wrapasauv2.cpp`, `send`), so the fraction was lost; the fork passes it whole on a MIDI2-preferring port |
 | **AUv3** | Yes, type `aumi` (`auv3/build-helper.cpp:251`) | Yes | **No**: the output list is `kMIDIProtocol_1_0` and MIDI2 is down-converted (`auv3/process.mm:821`, `~898`) |
 | **VST® 3** | Partly: mapped to `kInstrumentSynth` (`vst3/categories.cpp:62`), since VST3 has no MIDI-effect category | Note on/off only. `CLAP_EVENT_MIDI` / `MIDI2` output is **dropped** (`vst3/process.cpp:810`) | No. VST3 note events have a `tuning` field (cents), but the wrapper hard-codes it to `0` |
 
@@ -136,16 +136,17 @@ latch table) stays here.
    checks the output events. A debug build logs the host's `supported_dialects()` and the type of every
    incoming note event, to find out what Bitwig, REAPER etc. actually send. Then listen through StageHand → Retune → StruckSynth
    (which already plays 7.9 pitch).
-3. **AUv2 / AUv3 / VST3 via clap-wrapper**, MIDI 1.0 (rounded) behaviour only. Done for AUv2 and
-   VST3 (M4). Under clap-wrapper the ports prefer MIDI 1.0. Otherwise the AUv2 wrapper would ask an
-   AU host for MIDI 2.0, and its MIDI 2.0 → 1.0 output conversion keeps only the key, which rounds
-   down. The VST3 wrapper always sends CLAP note events, so ClapNoteRemap gives the rounded key there. Check them in Logic
+3. **AUv2 / AUv3 / VST3 via clap-wrapper.** Done for AUv2 and VST3 (M4). Under the VST3 wrapper the
+   ports prefer MIDI 1.0 (rounded behaviour). Under the AUv2 wrapper they prefer MIDI 2.0 since
+   2026-11-18: the wrapper is Unlikelyware's fork, whose AUv2 asks the host for MIDI 2.0 and passes
+   MIDI 2.0 output whole (upstream's keeps only the key, which rounds down). The VST3 wrapper always sends CLAP note events, so ClapNoteRemap gives the rounded key there. Check them in Logic
    (AU MIDI FX slot), REAPER and Bitwig. VST3 loading as an "instrument" is a known limitation.
 4. **(Optional) wrapper patches to keep the fraction**:
-   - AUv2/AUv3: emit a `kMIDIProtocol_2_0` event list and pass `CLAP_EVENT_MIDI2` through raw when
-     the host negotiated MIDI 2.0.
+   - AUv2: done (2026-11-18) in Unlikelyware's fork, erickampman/clap-wrapper `unlikelyware`: a
+     MIDI2-preferring port gets a `kMIDIProtocol_2_0` event list and `CLAP_EVENT_MIDI2` passes raw.
+     Heard in Logic with EDOSpread12. AUv3 not done.
    - VST3: set `noteOn.tuning` from a CLAP tuning note expression or a 7.9 pitch.
-   These go in our vendored copy, and possibly upstream.
+   These go in the fork, and possibly upstream.
 5. **GUI** (DPF/NanoVG, as in the synths). Three controls: Divisions, Octaves, Steps (plus a read-out of
    the resulting cents). Built (2026-11-03): "Editor", below.
 
